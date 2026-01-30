@@ -9,9 +9,14 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.93.2",
+    "face-api.js": "^0.22.2",
+    "lucide-react": "^0.563.0",
     "next": "16.1.5",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "stripe": "^20.2.0",
+    "supabase": "^2.72.9"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
