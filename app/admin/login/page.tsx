@@ -33,7 +33,7 @@ export default function AdminLogin() {
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-black text-white italic tracking-tighter">
-            ADMIN<span className="text-yellow-400">LOGIN</span>
+            ADMIN<span className="text-[#9ECD1D]">LOGIN</span>
           </h1>
         </div>
 
@@ -51,7 +51,7 @@ export default function AdminLogin() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@email.com"
-                className="w-full bg-black border border-zinc-800 rounded-xl pl-12 pr-4 py-4 text-white focus:border-yellow-400 outline-none transition-all"
+                className="w-full bg-black border border-zinc-800 rounded-xl pl-12 pr-4 py-4 text-white focus:border-[#9ECD1D] outline-none transition-all"
               />
             </div>
           </div>
@@ -66,7 +66,7 @@ export default function AdminLogin() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-black border border-zinc-800 rounded-xl pl-12 pr-4 py-4 text-white focus:border-yellow-400 outline-none transition-all"
+                className="w-full bg-black border border-zinc-800 rounded-xl pl-12 pr-4 py-4 text-white focus:border-[#9ECD1D] outline-none transition-all"
               />
             </div>
           </div>
@@ -74,7 +74,7 @@ export default function AdminLogin() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-yellow-400 text-black font-black py-4 rounded-xl hover:bg-yellow-300 transition-all flex items-center justify-center gap-2 uppercase text-sm tracking-widest disabled:opacity-50 mt-4"
+            className="w-full cursor-pointer bg-[#9ECD1D] text-black font-black py-4 rounded-xl hover:bg-[#9EEE1D] transition-all flex items-center justify-center gap-2 uppercase text-sm tracking-widest disabled:opacity-50 mt-4"
           >
             {loading ? <Loader2 className="animate-spin w-5 h-5" /> : 'Entrar'}
           </button>

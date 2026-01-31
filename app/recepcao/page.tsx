@@ -19,22 +19,24 @@ export default function RecepcaoCheckin() {
                     faceapi.nets.faceRecognitionNet.loadFromUri('/models')
                 ]);
 
-                // 2. Buscar alunos (removi o filtro de status para teste imediato)
+                // 2. Buscar APENAS alunos ativos com biometria
                 const { data, error } = await supabase
                     .from('alunos')
                     .select('nome, face_descriptor')
+                    .eq('status_assinatura', 'ativo') // Garante o bloqueio de cancelados
                     .not('face_descriptor', 'is', null);
 
                 if (error) throw error;
-                console.log("Alunos carregados:", data?.length);
                 setAlunosAtivos(data || []);
 
-                const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+                // 3. Iniciar Câmera
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
                 if (videoRef.current) videoRef.current.srcObject = stream;
-                
+
                 setMensagem('Aguardando rosto...');
             } catch (err) {
-                setMensagem('❌ Erro ao iniciar');
+                console.error(err);
+                setMensagem('❌ Erro na Câmera/Modelos');
             }
         }
         prepararRecepcao();
@@ -42,7 +44,6 @@ export default function RecepcaoCheckin() {
 
     useEffect(() => {
         const interval = setInterval(async () => {
-            // Se não houver vídeo ou alunos, ou se já estivermos processando um acesso, ignora
             if (!videoRef.current || alunosAtivos.length === 0 || estaProcessando) return;
 
             const detection = await faceapi
@@ -52,20 +53,16 @@ export default function RecepcaoCheckin() {
 
             if (detection) {
                 let melhorMatch = null;
-                let menorDistancia = 0.55; // Aumentei para 0.55 (mais tolerante)
+                let menorDistancia = 0.50; // Um pouco mais rigoroso para evitar falsos positivos
 
                 for (const aluno of alunosAtivos) {
-                    // CORREÇÃO CRÍTICA: Garantir que o descritor seja um Float32Array
-                    // O Supabase às vezes retorna como objeto {0: 0.1, 1: 0.2...}
-                    const rawDescriptor = Array.isArray(aluno.face_descriptor) 
-                        ? aluno.face_descriptor 
+                    const rawDescriptor = Array.isArray(aluno.face_descriptor)
+                        ? aluno.face_descriptor
                         : Object.values(aluno.face_descriptor);
 
-                    const descritorSalvo = new Float32Array(rawDescriptor);
-                    
                     const distancia = faceapi.euclideanDistance(
                         detection.descriptor,
-                        descritorSalvo
+                        new Float32Array(rawDescriptor)
                     );
 
                     if (distancia < menorDistancia) {
@@ -77,17 +74,22 @@ export default function RecepcaoCheckin() {
                 if (melhorMatch) {
                     setEstaProcessando(true);
                     setMensagem(`✅ BEM-VINDO: ${melhorMatch.toUpperCase()}`);
-
-                    await supabase.from('checkins').insert([{ aluno_nome: melhorMatch }]);
                     
+                    // Inserir checkin no banco
+                    await supabase.from('checkins').insert([{
+                        aluno_nome: melhorMatch,
+                        data_hora: new Date().toISOString()
+                    }]);
+
                     setTimeout(() => {
                         setMensagem('Aguardando rosto...');
                         setEstaProcessando(false);
-                    }, 4000); 
+                    }, 4000);
                 } else {
-                    // Se detectou rosto mas não reconheceu ninguém
-                    setMensagem('❌ NÃO RECONHECIDO');
-                    setTimeout(() => !estaProcessando && setMensagem('Aguardando rosto...'), 1000);
+                    // Detectou rosto mas não está na lista de ATIVOS
+                    setMensagem('❌ ACESSO NEGADO OU NÃO CADASTRADO');
+                    // Pequeno delay para não travar a tela no erro
+                    setTimeout(() => !estaProcessando && setMensagem('Aguardando rosto...'), 2000);
                 }
             }
         }, 1000);
@@ -96,28 +98,36 @@ export default function RecepcaoCheckin() {
     }, [alunosAtivos, estaProcessando]);
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white font-sans p-4">
-            <h1 className="text-3xl font-black mb-8 text-yellow-400 italic">SMART RECEPÇÃO</h1>
+        <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white p-4">
+            <h1 className="text-3xl font-black mb-8 text-[#9ECD1D] italic tracking-tighter">SMART RECEPÇÃO</h1>
 
-            <div className={`w-full max-w-md p-6 rounded-2xl mb-8 text-center text-xl font-bold border-4 transition-all ${
-                mensagem.includes('✅') ? 'bg-green-600 border-green-400 text-white shadow-[0_0_20px_rgba(34,197,94,0.5)]' : 
-                mensagem.includes('❌') ? 'bg-red-900 border-red-600 text-white' : 
-                'bg-zinc-900 border-zinc-800 text-zinc-500'
+            {/* BOX DE MENSAGEM DINÂMICO */}
+            <div className={`w-full max-w-md p-6 rounded-2xl mb-8 text-center text-xl font-bold border-4 transition-all duration-300 ${
+                mensagem.includes('✅') ? 'bg-green-600 border-green-400 shadow-[0_0_30px_rgba(34,197,94,0.4)]' :
+                mensagem.includes('❌') ? 'bg-red-600 border-red-400 animate-shake' :
+                'bg-zinc-900 border-zinc-800 text-zinc-400'
             }`}>
                 {mensagem}
             </div>
 
-            <div className="relative rounded-[2.5rem] overflow-hidden border-8 border-zinc-900 shadow-2xl">
-                <video ref={videoRef} autoPlay muted width="640" height="480" className="scale-x-[-1]" />
-                <div className="absolute inset-0 pointer-events-none border-[20px] border-black/20"></div>
+            {/* CONTAINER DO VÍDEO */}
+            <div className="relative rounded-[2.5rem] overflow-hidden border-8 border-zinc-900 shadow-2xl bg-zinc-900">
+                <video ref={videoRef} autoPlay muted width="640" height="480" className="scale-x-[-1] object-cover" />
+                
+                {/* Overlay de Scan */}
                 {!estaProcessando && (
-                    <div className="absolute top-0 left-0 w-full h-1 bg-yellow-400 shadow-[0_0_15px_#facc15] animate-scan"></div>
+                    <div className="absolute top-0 left-0 w-full h-1 bg-[#9ECD1D] shadow-[0_0_20px_#9ECD1D] animate-scan"></div>
                 )}
+                
+                {/* Moldura de Foco */}
+                <div className="absolute inset-0 border-[40px] border-black/10 pointer-events-none"></div>
             </div>
 
             <style jsx>{`
-                @keyframes scan { 0% { top: 0%; } 50% { top: 100%; } 100% { top: 0%; } }
-                .animate-scan { position: absolute; animation: scan 3s linear infinite; }
+                @keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
+                @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+                .animate-scan { position: absolute; animation: scan 2s linear infinite; }
+                .animate-shake { animation: shake 0.2s ease-in-out 0s 2; }
             `}</style>
         </div>
     );

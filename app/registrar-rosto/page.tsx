@@ -3,29 +3,49 @@
 import { useEffect, useRef, useState, Suspense } from 'react';
 import * as faceapi from 'face-api.js';
 import { useSearchParams } from 'next/navigation';
+import { supabase } from '@/src/lib/supabase'; // Certifique-se de que o caminho está correto
 
 function RegistrarRostoConteudo() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const searchParams = useSearchParams();
     
-    // Captura os dois possíveis parâmetros da URL
     const emailDaUrl = searchParams.get('email'); 
     const sessionId = searchParams.get('session_id');
     
-    const [status, setStatus] = useState('Carregando IA...');
+    const [status, setStatus] = useState('Iniciando...');
     const [carregando, setCarregando] = useState(false);
+    const [emailFinal, setEmailFinal] = useState<string | null>(null);
 
     useEffect(() => {
-        // Se não tiver e-mail nem session_id, algo está errado
-        if (!emailDaUrl && !sessionId) {
-            setStatus('❌ Erro: Identificação não encontrada na URL');
-            return;
+        async function identificarUsuario() {
+            // 1. Tenta pegar da URL (Prioridade para fluxo pós-pagamento)
+            if (emailDaUrl && !emailDaUrl.includes('{')) {
+                setEmailFinal(emailDaUrl);
+                iniciarSistema();
+                return;
+            }
+
+            // 2. Se não tem na URL ou é inválido, busca na Sessão ativa
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (session?.user?.email) {
+                setEmailFinal(session.user.email);
+                iniciarSistema();
+            } else if (sessionId) {
+                // Se houver session_id mas não email (fluxo Stripe), 
+                // o backend tentará resolver, mas ainda precisamos do iniciarSistema
+                iniciarSistema();
+            } else {
+                setStatus('❌ Erro: Identificação não encontrada. Faça login novamente.');
+            }
         }
-        iniciarSistema();
+
+        identificarUsuario();
     }, [emailDaUrl, sessionId]);
 
     async function iniciarSistema() {
         try {
+            setStatus('Carregando modelos de IA...');
             await Promise.all([
                 faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
                 faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
@@ -46,6 +66,7 @@ function RegistrarRostoConteudo() {
     }
 
     async function capturarBioMetria() {
+        // Agora usamos o emailFinal que veio ou da URL ou da Sessão
         if (!videoRef.current || carregando) return;
 
         setCarregando(true);
@@ -64,7 +85,7 @@ function RegistrarRostoConteudo() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        email: emailDaUrl?.includes('{') ? null : emailDaUrl, // Ignora se for o texto do Stripe
+                        email: emailFinal, 
                         sessionId: sessionId,
                         faceDescriptor: faceArray
                     }),
@@ -74,6 +95,8 @@ function RegistrarRostoConteudo() {
 
                 if (resultado.success) {
                     setStatus(`✅ SUCESSO! Biometria cadastrada.`);
+                    // Redireciona após 2 segundos para o perfil
+                    setTimeout(() => window.location.href = '/perfil', 2000);
                 } else {
                     setStatus('❌ Erro: ' + resultado.error);
                 }
@@ -108,7 +131,7 @@ function RegistrarRostoConteudo() {
 
                 <button
                     onClick={capturarBioMetria}
-                    disabled={carregando || !!status.includes('✅')}
+                    disabled={carregando || !!status.includes('✅') || (!emailFinal && !sessionId)}
                     className="mt-8 w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-yellow-300 transition-all disabled:opacity-30 shadow-xl shadow-yellow-400/10"
                 >
                     {carregando ? 'Processando...' : 'Capturar Biometria'}

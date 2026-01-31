@@ -1,24 +1,39 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/src/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 export function useAdmin() {
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
   const router = useRouter();
 
   useEffect(() => {
-    async function checkUser() {
+    async function verificarAcesso() {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session) {
-        router.push('/admin/login');
-      } else {
-        setLoading(false);
+        router.replace('/admin/login');
+        return;
       }
+
+      const { data: perfil } = await supabase
+        .from('alunos')
+        .select('role')
+        .eq('email', session.user.email)
+        .maybeSingle();
+
+      if (!perfil || (perfil.role !== 'admin' && perfil.role !== 'aluno_admin')) {
+        router.replace('/'); 
+        return;
+      }
+
+      setUser(session.user);
+      setLoading(false);
     }
-    checkUser();
+
+    verificarAcesso();
   }, [router]);
 
-  return { loading };
+  return { loading, user };
 }

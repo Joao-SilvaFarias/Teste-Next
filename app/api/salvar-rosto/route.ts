@@ -36,7 +36,7 @@ export async function POST(req: Request) {
         email: emailLimpo, 
         nome: nomeFinal, // <--- AGORA O NOME ESTÁ AQUI PARA NÃO DAR ERRO
         face_descriptor: faceDescriptor,
-        status_assinatura: 'active' 
+        status_assinatura: 'ativo' 
       }, { onConflict: 'email' });
 
     if (error) {
