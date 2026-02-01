@@ -23,7 +23,7 @@ export function useAdmin() {
         .eq('email', session.user.email)
         .maybeSingle();
 
-      if (!perfil || (perfil.role !== 'admin' && perfil.role !== 'aluno_admin')) {
+      if (!perfil || (perfil.role !== 'admin')) {
         router.replace('/'); 
         return;
       }

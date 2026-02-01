@@ -1,76 +1,81 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useState } from 'react';
 import { supabase } from '@/src/lib/supabase';
-import { Lock, Mail, CreditCard, LogOut, ArrowRight } from 'lucide-react';
+import { Lock, Mail, CreditCard, LogOut, ArrowRight, Loader2 } from 'lucide-react';
+import { useAuth } from '@/src/context/AuthContext';
 
 export default function PerfilAluno() {
+  const { user, loading: authLoading, signOut } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [user, setUser] = useState<any>(null);
-  const [carregando, setCarregando] = useState(false);
-  const [isLogin, setIsLogin] = useState(true);
+  const [carregandoInterno, setCarregandoInterno] = useState(false);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-    });
-  }, []);
-
-  // Função disparada pelo Form (aceita o Enter)
-  async function handleAuth(e: React.FormEvent) {
-    e.preventDefault(); // Impede a página de recarregar
-    setCarregando(true);
+  // Função disparada pelo Form (Apenas Login)
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setCarregandoInterno(true);
     
-    const { data, error } = isLogin 
-      ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ 
+      email, 
+      password 
+    });
 
     if (error) {
-      alert(error.message);
-    } else {
-      setUser(data.user);
+      alert("Erro ao entrar: " + error.message);
+      setCarregandoInterno(false);
     }
-    setCarregando(false);
   }
 
   async function gerenciarAssinatura() {
-    setCarregando(true);
+    setCarregandoInterno(true);
     try {
       const res = await fetch('/api/portal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: user.email }),
+        body: JSON.stringify({ email: user?.email }),
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
       else alert(data.error);
     } catch (err) {
-      alert("Erro ao conectar ao portal.");
+      alert("Erro ao conectar ao portal de pagamentos.");
     }
-    setCarregando(false);
+    setCarregandoInterno(false);
   }
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-[#9ECD1D] animate-spin" />
+      </div>
+    );
+  }
+
+  // --- VISÃO LOGADO ---
   if (user) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-zinc-900 border border-zinc-800 p-10 rounded-[2.5rem] shadow-2xl text-center animate-in fade-in zoom-in duration-300">
+        <div className="max-w-md w-full bg-zinc-900 border border-zinc-800 p-10 rounded-[2.5rem] shadow-2xl text-center">
           <div className="w-20 h-20 bg-[#9ECD1D]/10 text-[#9ECD1D] rounded-full flex items-center justify-center mx-auto mb-6">
             <CreditCard size={32} />
           </div>
           <h1 className="text-2xl font-black uppercase mb-2">Área do Aluno</h1>
-          <p className="text-zinc-500 mb-8 text-sm">Logado como: <span className="text-zinc-300 font-bold">{user.email}</span></p>
+          <p className="text-zinc-500 mb-8 text-sm">
+            Logado como: <span className="text-zinc-300 font-bold">{user.email}</span>
+          </p>
           
           <button 
             onClick={gerenciarAssinatura}
-            disabled={carregando}
-            className="w-full bg-[#9ECD1D] text-black font-black py-5 rounded-2xl hover:scale-[1.02] transition-all disabled:opacity-50 uppercase tracking-widest text-xs flex items-center justify-center gap-2 cursor-pointer"
+            disabled={carregandoInterno}
+            className="w-full bg-[#9ECD1D] text-black font-black py-5 rounded-2xl hover:scale-[1.02] transition-all disabled:opacity-50 uppercase tracking-widest text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#9ECD1D]/10"
           >
-            {carregando ? 'Redirecionando...' : 'Gerenciar Assinatura'}
+            {carregandoInterno ? 'Processando...' : 'Gerenciar Pagamentos'}
             <ArrowRight size={16} />
           </button>
 
           <button 
-            onClick={() => supabase.auth.signOut().then(() => setUser(null))}
+            onClick={signOut}
             className="mt-8 cursor-pointer text-zinc-600 hover:text-red-400 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 mx-auto transition-colors"
           >
             <LogOut size={14} /> Sair da conta
@@ -80,18 +85,20 @@ export default function PerfilAluno() {
     );
   }
 
+  // --- VISÃO DESLOGADO (APENAS LOGIN) ---
   return (
     <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-6">
       <div className="max-w-md w-full bg-zinc-900 border border-zinc-800 p-10 rounded-[2.5rem] shadow-2xl">
-        <h1 className="text-3xl font-black mb-2 uppercase italic tracking-tighter">
-          SMART<span className="text-[#9ECD1D]">FIT</span>
-        </h1>
-        <p className="text-zinc-500 text-sm mb-8">
-          {isLogin ? 'Faça login para gerenciar sua conta.' : 'Crie sua senha de acesso.'}
-        </p>
+        <header className="mb-8">
+            <h1 className="text-3xl font-black uppercase italic tracking-tighter">
+                SMART<span className="text-[#9ECD1D]">FIT</span>
+            </h1>
+            <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mt-2">
+                Acesse sua área exclusiva
+            </p>
+        </header>
         
-        {/* ENVOLVENDO COM FORM PARA HABILITAR O ENTER */}
-        <form onSubmit={handleAuth} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-4">
           <div className="relative">
             <Mail className="absolute left-4 top-4 text-zinc-600" size={18} />
             <input 
@@ -100,7 +107,7 @@ export default function PerfilAluno() {
               placeholder="Seu e-mail"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-black border border-zinc-800 rounded-2xl pl-12 pr-4 py-4 focus:border-[#9ECD1D] outline-none transition-all"
+              className="w-full bg-black border border-zinc-800 rounded-2xl pl-12 pr-4 py-4 focus:border-[#9ECD1D] outline-none transition-all placeholder:text-zinc-700 text-sm"
             />
           </div>
 
@@ -112,18 +119,22 @@ export default function PerfilAluno() {
               placeholder="Sua senha"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-black border border-zinc-800 rounded-2xl pl-12 pr-4 py-4 focus:border-[#9ECD1D] outline-none transition-all"
+              className="w-full bg-black border border-zinc-800 rounded-2xl pl-12 pr-4 py-4 focus:border-[#9ECD1D] outline-none transition-all placeholder:text-zinc-700 text-sm"
             />
           </div>
 
           <button 
-            type="submit" // Define explicitamente como o gatilho do formulário
-            disabled={carregando}
-            className="w-full bg-[#9ECD1D] cursor-pointer text-black font-black py-5 rounded-2xl mt-4 hover:scale-[1.02] transition-all disabled:opacity-50 uppercase tracking-widest text-xs shadow-lg shadow-[#9ECD1D]/10"
+            type="submit"
+            disabled={carregandoInterno}
+            className="w-full bg-[#9ECD1D] cursor-pointer text-black font-black py-5 rounded-2xl mt-4 hover:scale-[1.02] transition-all disabled:opacity-50 uppercase tracking-[0.2em] text-xs shadow-xl shadow-[#9ECD1D]/10"
           >
-            {carregando ? 'Processando...' : isLogin ? 'Entrar' : 'Cadastrar'}
+            {carregandoInterno ? 'Autenticando...' : 'Entrar no Sistema'}
           </button>
         </form>
+
+        <p className="mt-8 text-center text-[10px] text-zinc-600 font-bold uppercase tracking-[0.1em] max-w-[200px] mx-auto">
+            Acesso restrito para alunos matriculados
+        </p>
       </div>
     </div>
   );
