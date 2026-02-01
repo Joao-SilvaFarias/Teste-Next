@@ -2,33 +2,46 @@
 
 import { useState } from 'react';
 import { supabase } from '@/src/lib/supabase';
-import { Lock, Mail, CreditCard, LogOut, ArrowRight, Loader2 } from 'lucide-react';
+import { Lock, Mail, CreditCard, LogOut, Loader2 } from 'lucide-react';
 import { useAuth } from '@/src/context/AuthContext';
 
 export default function PerfilAluno() {
   const { user, loading: authLoading, signOut } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [carregandoInterno, setCarregandoInterno] = useState(false);
+  // Substitua o estado único por esses dois
+const [loadingLogin, setLoadingLogin] = useState(false);
+const [loadingPortal, setLoadingPortal] = useState(false);
 
+// Na função handleLogin, use setLoadingLogin
+// Na função gerenciarAssinatura, use setLoadingPortal
+
+  // Função disparada pelo Form (Apenas Login)
   // Função disparada pelo Form (Apenas Login)
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    setCarregandoInterno(true);
-    
-    const { error } = await supabase.auth.signInWithPassword({ 
-      email, 
-      password 
-    });
+    setLoadingLogin(true);
 
-    if (error) {
-      alert("Erro ao entrar: " + error.message);
-      setCarregandoInterno(false);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        alert("Erro ao entrar: " + error.message);
+        // Só resetamos aqui se houver erro para o usuário tentar de novo
+        setLoadingLogin(false);
+      }
+      // Se não houver erro, o AuthContext atualizará o 'user' 
+      // e o React trocará a renderização para o painel logado.
+    } catch (err) {
+      setLoadingLogin(false);
     }
   }
 
   async function gerenciarAssinatura() {
-    setCarregandoInterno(true);
+    setLoadingPortal(true);
     try {
       const res = await fetch('/api/portal', {
         method: 'POST',
@@ -41,7 +54,7 @@ export default function PerfilAluno() {
     } catch (err) {
       alert("Erro ao conectar ao portal de pagamentos.");
     }
-    setCarregandoInterno(false);
+    setLoadingPortal(false);
   }
 
   if (authLoading) {
@@ -64,17 +77,16 @@ export default function PerfilAluno() {
           <p className="text-zinc-500 mb-8 text-sm">
             Logado como: <span className="text-zinc-300 font-bold">{user.email}</span>
           </p>
-          
-          <button 
+
+          <button
             onClick={gerenciarAssinatura}
-            disabled={carregandoInterno}
+            disabled={loadingPortal}
             className="w-full bg-[#9ECD1D] text-black font-black py-5 rounded-2xl hover:scale-[1.02] transition-all disabled:opacity-50 uppercase tracking-widest text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#9ECD1D]/10"
           >
-            {carregandoInterno ? 'Processando...' : 'Gerenciar Pagamentos'}
-            <ArrowRight size={16} />
+            {loadingPortal ? <Loader2 className="animate-spin w-5 h-5" /> : 'Gerenciar Pagamentos'}
           </button>
 
-          <button 
+          <button
             onClick={signOut}
             className="mt-8 cursor-pointer text-zinc-600 hover:text-red-400 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 mx-auto transition-colors"
           >
@@ -90,20 +102,20 @@ export default function PerfilAluno() {
     <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-6">
       <div className="max-w-md w-full bg-zinc-900 border border-zinc-800 p-10 rounded-[2.5rem] shadow-2xl">
         <header className="mb-8">
-            <h1 className="text-3xl font-black uppercase italic tracking-tighter">
-                SMART<span className="text-[#9ECD1D]">FIT</span>
-            </h1>
-            <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mt-2">
-                Acesse sua área exclusiva
-            </p>
+          <h1 className="text-3xl font-black uppercase italic tracking-tighter">
+            SMART<span className="text-[#9ECD1D]">FIT</span>
+          </h1>
+          <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mt-2">
+            Acesse sua área exclusiva
+          </p>
         </header>
-        
+
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="relative">
             <Mail className="absolute left-4 top-4 text-zinc-600" size={18} />
-            <input 
+            <input
               required
-              type="email" 
+              type="email"
               placeholder="Seu e-mail"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -113,9 +125,9 @@ export default function PerfilAluno() {
 
           <div className="relative">
             <Lock className="absolute left-4 top-4 text-zinc-600" size={18} />
-            <input 
+            <input
               required
-              type="password" 
+              type="password"
               placeholder="Sua senha"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -123,17 +135,17 @@ export default function PerfilAluno() {
             />
           </div>
 
-          <button 
+          <button
             type="submit"
-            disabled={carregandoInterno}
-            className="w-full bg-[#9ECD1D] cursor-pointer text-black font-black py-5 rounded-2xl mt-4 hover:scale-[1.02] transition-all disabled:opacity-50 uppercase tracking-[0.2em] text-xs shadow-xl shadow-[#9ECD1D]/10"
+            disabled={loadingLogin}
+            className="w-full bg-[#9ECD1D] flex justify-center items-center cursor-pointer text-black font-black py-5 rounded-2xl mt-4 hover:scale-[1.02] transition-all disabled:opacity-50 uppercase tracking-[0.2em] text-xs shadow-xl shadow-[#9ECD1D]/10"
           >
-            {carregandoInterno ? 'Autenticando...' : 'Entrar no Sistema'}
+            {loadingLogin ? <Loader2 className="animate-spin w-5 h-5" /> : 'Entrar no Sistema'}
           </button>
         </form>
 
         <p className="mt-8 text-center text-[10px] text-zinc-600 font-bold uppercase tracking-[0.1em] max-w-[200px] mx-auto">
-            Acesso restrito para alunos matriculados
+          Acesso restrito para alunos matriculados
         </p>
       </div>
     </div>
