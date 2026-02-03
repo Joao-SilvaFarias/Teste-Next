@@ -92,7 +92,7 @@ export default function AdminLogin() {
           <button
             type="submit"
             disabled={loadingInterno}
-            className="w-full cursor-pointer bg-[#9ECD1D] text-black font-black py-4 rounded-xl hover:bg-[#b4e637] transition-all flex items-center justify-center gap-2 uppercase text-sm tracking-widest disabled:opacity-50 mt-4 shadow-lg shadow-[#9ECD1D]/10"
+            className="w-full cursor-pointer bg-[#9ECD1D] text-black font-black py-4 rounded-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2 uppercase text-sm tracking-widest disabled:opacity-50 mt-4 shadow-lg shadow-[#9ECD1D]/10"
           >
             {loadingInterno ? <Loader2 className="animate-spin w-5 h-5" /> : 'Acessar Painel'}
           </button>
