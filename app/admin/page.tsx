@@ -3,10 +3,10 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { 
-    CheckCircle, XCircle, Activity, TrendingUp, Loader2, 
-    MessageCircle, DollarSign, Clock, LogOut, Users, 
-    Search, FileDown, UserX, Zap, Info 
+import {
+    CheckCircle, XCircle, Activity, TrendingUp, Loader2,
+    MessageCircle, DollarSign, Clock, LogOut, Users,
+    Search, FileDown, UserX, Zap, Info
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, CartesianGrid,
@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import PageSkeleton from '@/components/PageSkeleton';
 
 // --- INTERFACES ---
 interface Aluno {
@@ -40,10 +41,10 @@ export default function AdminDashboard() {
     const { isAdmin, loading: authLoading, user } = useAuth();
     const router = useRouter();
 
-    const [stats, setStats] = useState({ 
-        ativos: 0, pendentes: 0, total: 0, novosNoMes: 0, churnRate: '0' 
+    const [stats, setStats] = useState({
+        ativos: 0, pendentes: 0, total: 0, novosNoMes: 0, churnRate: '0'
     });
-    
+
     const [dadosGrafico, setDadosGrafico] = useState<DadoGrafico[]>([]);
     const [alunosRecuperacao, setAlunosRecuperacao] = useState<Aluno[]>([]);
     const [alunosEmRisco, setAlunosEmRisco] = useState<Aluno[]>([]);
@@ -51,6 +52,13 @@ export default function AdminDashboard() {
     const [carregandoDados, setCarregandoDados] = useState(true);
     const [isMounted, setIsMounted] = useState(false);
     const [termoPesquisa, setTermoPesquisa] = useState('');
+    const [agoraParaTimer, setAgoraParaTimer] = useState(new Date());
+
+    // Atualiza os timers de treino a cada minuto
+    useEffect(() => {
+        const timer = setInterval(() => setAgoraParaTimer(new Date()), 60000);
+        return () => clearInterval(timer);
+    }, []);
 
     useEffect(() => { setIsMounted(true); }, []);
 
@@ -109,7 +117,7 @@ export default function AdminDashboard() {
                 checkinsRes.data.forEach((c: any) => {
                     const h = new Date(c.data_hora).getHours();
                     const ponto = esqueleto.find(p => p.hora === `${h}:00`);
-                    if (ponto) ponto.visitas += 0.5;
+                    if (ponto) ponto.visitas += 1;
                 });
             }
             setDadosGrafico(esqueleto);
@@ -124,40 +132,34 @@ export default function AdminDashboard() {
         if (!authLoading && isAdmin) {
             carregarDadosGerais();
             buscarPresentes();
-
-            // CORREÇÃO: Verifique se o Realtime está ativado no Supabase (Database -> Replication)
-            const canal = supabase
-                .channel('admin-changes')
-                .on(
-                    'postgres_changes', 
-                    { event: '*', table: 'checkins', schema: 'public' }, 
-                    () => {
-                        buscarPresentes();
-                        carregarDadosGerais();
-                    }
-                )
-                .subscribe();
-
-            return () => {
-                supabase.removeChannel(canal);
-            };
+            const canal = supabase.channel('admin-changes')
+                .on('postgres_changes', { event: '*', table: 'checkins', schema: 'public' }, () => {
+                    buscarPresentes();
+                    carregarDadosGerais();
+                }).subscribe();
+            return () => { supabase.removeChannel(canal); };
         }
     }, [authLoading, isAdmin, carregarDadosGerais, buscarPresentes]);
+
+    // Inteligência: Horário de Pico
+    const horarioPico = useMemo(() => {
+        if (dadosGrafico.length === 0) return "--:--";
+        const maior = [...dadosGrafico].sort((a, b) => b.visitas - a.visitas)[0];
+        return maior?.visitas > 0 ? maior.hora : "--:--";
+    }, [dadosGrafico]);
 
     const presentesFiltrados = useMemo(() => {
         return presentes.filter(a => a.aluno_nome.toLowerCase().includes(termoPesquisa.toLowerCase()));
     }, [presentes, termoPesquisa]);
 
     const recuperacaoFiltrada = useMemo(() => {
-        return alunosRecuperacao
-            .filter(aluno => aluno.nome.toLowerCase().includes(termoPesquisa.toLowerCase()) && aluno.email !== user?.email)
-            .slice(0, 10);
+        return alunosRecuperacao.filter(aluno => aluno.nome.toLowerCase().includes(termoPesquisa.toLowerCase()) && aluno.email !== user?.email).slice(0, 10);
     }, [alunosRecuperacao, termoPesquisa, user?.email]);
 
     const gerarPDF = () => {
         const doc = new jsPDF();
         doc.setFontSize(20);
-        doc.text("Relatorio de Gestao - Academia AI", 14, 20);
+        doc.text("Relatorio de Gestao - SmartFit Clone", 14, 20);
         autoTable(doc, {
             startY: 35,
             head: [['Metrica', 'Valor']],
@@ -165,12 +167,13 @@ export default function AdminDashboard() {
                 ['Alunos Ativos', stats.ativos.toString()],
                 ['Receita Mensal Prevista', `R$ ${(stats.ativos * 129).toLocaleString()}`],
                 ['Alunos Presentes Agora', presentes.length.toString()],
+                ['Horario de Pico (24h)', horarioPico],
                 ['Taxa de Churn', `${stats.churnRate}%`]
             ],
             theme: 'striped',
             headStyles: { fillColor: [158, 205, 29] }
         });
-        doc.save(`relatorio-${new Date().toISOString().split('T')[0]}.pdf`);
+        doc.save(`dashboard-admin-${new Date().toISOString().split('T')[0]}.pdf`);
     };
 
     const cobrarAluno = (aluno: Aluno) => {
@@ -180,31 +183,41 @@ export default function AdminDashboard() {
     };
 
     const forcarCheckout = async (aluno: AlunoPresente) => {
-        if(!confirm(`Deseja realizar o checkout manual de ${aluno.aluno_nome}?`)) return;
+        if (!confirm(`Deseja realizar o checkout manual de ${aluno.aluno_nome}?`)) return;
         await supabase.from('checkins').insert([{
             email: aluno.email, aluno_nome: aluno.aluno_nome, tipo: 'saida', data_hora: new Date().toISOString()
         }]);
     };
 
-    if (authLoading || !isMounted) return <div className="min-h-screen bg-zinc-950 flex items-center justify-center"><Loader2 className="animate-spin text-[#9ECD1D] w-10 h-10" /></div>;
+    const encerrarDia = async () => {
+        if (!confirm("Isso fará o checkout de todos os alunos ainda presentes. Confirmar?")) return;
+        const { error } = await supabase.rpc('realizar_auto_checkout');
+        if (error) alert("Erro ao encerrar dia: " + error.message);
+        else { alert("Dia encerrado!"); buscarPresentes(); }
+    };
+
+    if (authLoading || carregandoDados || !isMounted) return <PageSkeleton />;
 
     return (
-        <div className="min-h-screen bg-zinc-950 text-white p-4 md:p-8 pb-32 font-sans">
+        <div className="min-h-screen bg-zinc-950 text-white p-4 md:p-8 pb-32 font-sans animate-in fade-in duration-700">
             <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
                     <span className="px-2 py-0.5 bg-[#9ECD1D]/10 text-[#9ECD1D] text-[10px] font-bold rounded-full uppercase tracking-widest border border-[#9ECD1D]/20 mb-2 inline-block">Admin Mode</span>
                     <h1 className="text-4xl font-black italic uppercase tracking-tighter">Command <span className="text-[#9ECD1D]">Center</span></h1>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <button onClick={gerarPDF} className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-5 py-3 rounded-2xl font-bold text-sm hover:bg-zinc-800 transition-all">
-                        <FileDown size={18} /> PDF
+                <div className="flex flex-wrap items-center gap-3">
+                    <button onClick={encerrarDia} className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-4 py-2.5 rounded-2xl font-bold text-xs text-red-500 hover:bg-red-500 hover:text-white transition-all">
+                        <LogOut size={16} /> Encerrar Dia
+                    </button>
+                    <button onClick={gerarPDF} className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-4 py-2.5 rounded-2xl font-bold text-xs hover:bg-zinc-800 transition-all text-zinc-400">
+                        <FileDown size={16} /> Exportar
                     </button>
                     <div className="relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-                        <input 
-                            type="text" placeholder="Buscar aluno..." 
-                            className="bg-zinc-900 border border-zinc-800 rounded-2xl py-3 pl-12 pr-4 text-sm focus:border-[#9ECD1D] outline-none w-64 transition-all focus:w-80"
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
+                        <input
+                            type="text" placeholder="Buscar aluno..."
+                            className="bg-zinc-900 border border-zinc-800 rounded-2xl py-2.5 pl-11 pr-4 text-xs focus:border-[#9ECD1D] outline-none w-48 sm:w-64 transition-all focus:w-80"
                             value={termoPesquisa} onChange={(e) => setTermoPesquisa(e.target.value)}
                         />
                     </div>
@@ -212,59 +225,70 @@ export default function AdminDashboard() {
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <MetricCard title="Receita Estimada" value={`R$ ${(stats.ativos * 129).toLocaleString()}`} icon={<DollarSign size={18}/>} color="border-[#9ECD1D]/20" highlight />
-                <MetricCard title="Alunos Ativos" value={stats.ativos} icon={<Users size={18}/>} color="border-zinc-800" />
-                <MetricCard title="Ocupação Atual" value={`${Math.min(100, (presentes.length / 50) * 100).toFixed(0)}%`} icon={<Zap size={18}/>} color="border-zinc-800" />
-                <MetricCard title="Taxa de Churn" value={`${stats.churnRate}%`} icon={<TrendingUp size={18}/>} color="border-red-500/10" />
+                <MetricCard title="Receita Prevista" value={`R$ ${(stats.ativos * 129).toLocaleString()}`} icon={<DollarSign size={18} />} color="border-[#9ECD1D]/20" highlight />
+                <MetricCard title="Alunos Ativos" value={stats.ativos} icon={<Users size={18} />} color="border-zinc-800" />
+                <MetricCard title="Horário de Pico" value={horarioPico} icon={<Clock size={18} />} color="border-zinc-800" />
+                <MetricCard title="Taxa de Churn" value={`${stats.churnRate}%`} icon={<TrendingUp size={18} />} color="border-red-500/10" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-8">
                     <section className="bg-zinc-900/40 border border-zinc-800/50 p-6 rounded-[2.5rem]">
                         <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2 mb-6">
-                            <Activity size={16} className="text-[#9ECD1D]" /> Fluxo de Frequência (24h)
+                            <Activity size={16} className="text-[#9ECD1D]" /> Movimentação 24h
                         </h3>
                         <div className="h-[280px]">
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={dadosGrafico}>
                                     <defs>
                                         <linearGradient id="colorVis" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#9ECD1D" stopOpacity={0.3}/>
-                                            <stop offset="95%" stopColor="#9ECD1D" stopOpacity={0}/>
+                                            <stop offset="5%" stopColor="#9ECD1D" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#9ECD1D" stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.2} />
-                                    <XAxis dataKey="hora" stroke="#52525b" fontSize={11} axisLine={false} tickLine={false} />
-                                    <Tooltip contentStyle={{ backgroundColor: '#09090b', border: 'none', borderRadius: '12px' }} />
-                                    <Area 
-                                        type="monotone" 
-                                        dataKey="visitas" 
-                                        stroke="#9ECD1D" 
-                                        strokeWidth={3} 
-                                        fill="url(#colorVis)" 
-                                    />
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.1} />
+                                    <XAxis dataKey="hora" stroke="#52525b" fontSize={10} axisLine={false} tickLine={false} />
+                                    <Tooltip contentStyle={{ backgroundColor: '#09090b', border: 'none', borderRadius: '12px', fontSize: '12px' }} />
+                                    <Area type="monotone" dataKey="visitas" stroke="#9ECD1D" strokeWidth={3} fill="url(#colorVis)" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
                     </section>
 
                     <section>
-                        <h2 className="text-sm font-bold uppercase tracking-widest italic text-zinc-400 mb-6 px-2">Treinando Agora ({presentes.length})</h2>
+                        <h2 className="text-sm font-bold uppercase tracking-widest italic text-zinc-400 mb-6 px-2">
+                            No Shape Agora ({presentes.length})
+                        </h2>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {presentesFiltrados.map((aluno) => (
-                                <div key={aluno.email} className="bg-zinc-900/40 border border-zinc-800/50 p-4 rounded-3xl flex items-center justify-between group hover:border-[#9ECD1D]/30 transition-all">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-[#9ECD1D] rounded-xl flex items-center justify-center text-black font-black">{aluno.aluno_nome[0]}</div>
-                                        <div>
-                                            <p className="text-sm font-bold uppercase italic">{aluno.aluno_nome}</p>
-                                            <p className="text-[10px] text-zinc-500 font-medium italic">Desde as {new Date(aluno.data_hora).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                            {presentesFiltrados.map((aluno) => {
+                                const tempoPermanencia = Math.floor((agoraParaTimer.getTime() - new Date(aluno.data_hora).getTime()) / 60000);
+                                return (
+                                    <div key={aluno.email} className="bg-zinc-900/40 border border-zinc-800/50 p-4 rounded-3xl flex items-center justify-between group hover:border-[#9ECD1D]/30 transition-all">
+                                        <div className="flex items-center gap-3">
+                                            <div className="relative">
+                                                <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#9ECD1D] font-black border border-white/5 uppercase">
+                                                    {aluno.aluno_nome[0]}
+                                                </div>
+                                                {tempoPermanencia > 90 && (
+                                                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold uppercase italic leading-none mb-1">{aluno.aluno_nome}</p>
+                                                <p className="text-[9px] text-zinc-500 font-medium uppercase tracking-tighter italic">
+                                                    Há {tempoPermanencia} min treinando
+                                                </p>
+                                            </div>
                                         </div>
+                                        <button onClick={() => forcarCheckout(aluno)} className="p-2 text-zinc-700 hover:text-red-500 transition-colors">
+                                            <LogOut size={18} />
+                                        </button>
                                     </div>
-                                    <button onClick={() => forcarCheckout(aluno)} className="p-2 text-zinc-700 hover:text-red-500 transition-colors">
-                                        <LogOut size={18} />
-                                    </button>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </section>
                 </div>
@@ -285,13 +309,13 @@ export default function AdminDashboard() {
                                         <MessageCircle size={14} />
                                     </button>
                                 </div>
-                            )) : <p className="text-[10px] text-zinc-600 italic px-2">Engajamento está alto!</p>}
+                            )) : <p className="text-[10px] text-zinc-600 italic px-2">Todos engajados!</p>}
                         </div>
                     </section>
 
                     <section className="bg-zinc-900/40 border border-zinc-800/50 p-6 rounded-[2.5rem]">
                         <h3 className="text-sm font-bold uppercase tracking-widest text-[#9ECD1D] mb-6 flex items-center gap-2">
-                            <Info size={16} /> Ações Requeridas
+                            <Info size={16} /> Recuperação
                         </h3>
                         <div className="space-y-3">
                             {recuperacaoFiltrada.map((aluno, i) => (
@@ -300,7 +324,7 @@ export default function AdminDashboard() {
                                         <p className="text-xs font-bold uppercase truncate">{aluno.nome}</p>
                                         <p className="text-[9px] text-red-500 font-bold uppercase">{aluno.status_assinatura}</p>
                                     </div>
-                                    <button onClick={() => cobrarAluno(aluno)} className="text-[10px] font-black text-[#9ECD1D] uppercase border border-[#9ECD1D]/20 px-3 py-1.5 rounded-xl hover:bg-[#9ECD1D] hover:text-black transition-all">
+                                    <button onClick={() => cobrarAluno(aluno)} className="text-[9px] font-black text-[#9ECD1D] uppercase border border-[#9ECD1D]/20 px-3 py-1.5 rounded-xl hover:bg-[#9ECD1D] hover:text-black transition-all">
                                         Cobrar
                                     </button>
                                 </div>
@@ -315,7 +339,7 @@ export default function AdminDashboard() {
 
 function MetricCard({ title, value, icon, color, highlight }: any) {
     return (
-        <div className={`bg-zinc-900/40 border ${color} p-6 rounded-[2rem] flex items-center justify-between`}>
+        <div className={`bg-zinc-900/40 border ${color} p-6 rounded-[2rem] flex items-center justify-between hover:scale-[1.02] transition-transform`}>
             <div>
                 <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-1">{title}</p>
                 <p className={`text-2xl font-black italic tracking-tighter ${highlight ? "text-[#9ECD1D]" : "text-white"}`}>{value}</p>
