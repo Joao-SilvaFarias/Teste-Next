@@ -94,12 +94,10 @@ export default function AdminDashboard() {
 
                 setAlunosRecuperacao(lista.filter(a => a.status_assinatura?.toLowerCase().trim() !== 'ativo'));
 
-                // Lógica de Risco: Alunos ativos que não aparecem há mais de 7 dias
                 const emailsComAcessoRecente = new Set(ultimosAcessos.data?.filter(c => new Date(c.data_hora) > seteDiasAtras).map(c => c.email));
                 setAlunosEmRisco(lista.filter(a => a.status_assinatura === 'ativo' && !emailsComAcessoRecente.has(a.email) && a.email !== user?.email).slice(0, 5));
             }
 
-            // Gráfico de Fluxo
             const esqueleto: DadoGrafico[] = [];
             for (let i = 12; i >= 0; i--) {
                 const d = new Date();
@@ -116,7 +114,7 @@ export default function AdminDashboard() {
             }
             setDadosGrafico(esqueleto);
         } catch (error) {
-            console.error(error);
+            console.error("Erro ao carregar dados:", error);
         } finally {
             setCarregandoDados(false);
         }
@@ -126,12 +124,23 @@ export default function AdminDashboard() {
         if (!authLoading && isAdmin) {
             carregarDadosGerais();
             buscarPresentes();
-            const canal = supabase.channel('admin-realtime')
-                .on('postgres_changes', { event: 'INSERT', table: 'checkins' }, () => {
-                    buscarPresentes();
-                    carregarDadosGerais();
-                }).subscribe();
-            return () => { supabase.removeChannel(canal); };
+
+            // CORREÇÃO: Verifique se o Realtime está ativado no Supabase (Database -> Replication)
+            const canal = supabase
+                .channel('admin-changes')
+                .on(
+                    'postgres_changes', 
+                    { event: '*', table: 'checkins', schema: 'public' }, 
+                    () => {
+                        buscarPresentes();
+                        carregarDadosGerais();
+                    }
+                )
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(canal);
+            };
         }
     }, [authLoading, isAdmin, carregarDadosGerais, buscarPresentes]);
 
@@ -159,7 +168,7 @@ export default function AdminDashboard() {
                 ['Taxa de Churn', `${stats.churnRate}%`]
             ],
             theme: 'striped',
-            headStyles: { fill: [158, 205, 29] }
+            headStyles: { fillColor: [158, 205, 29] }
         });
         doc.save(`relatorio-${new Date().toISOString().split('T')[0]}.pdf`);
     };
@@ -175,7 +184,6 @@ export default function AdminDashboard() {
         await supabase.from('checkins').insert([{
             email: aluno.email, aluno_nome: aluno.aluno_nome, tipo: 'saida', data_hora: new Date().toISOString()
         }]);
-        buscarPresentes();
     };
 
     if (authLoading || !isMounted) return <div className="min-h-screen bg-zinc-950 flex items-center justify-center"><Loader2 className="animate-spin text-[#9ECD1D] w-10 h-10" /></div>;
@@ -203,7 +211,6 @@ export default function AdminDashboard() {
                 </div>
             </header>
 
-            {/* MÉTRICAS RÁPIDAS */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 <MetricCard title="Receita Estimada" value={`R$ ${(stats.ativos * 129).toLocaleString()}`} icon={<DollarSign size={18}/>} color="border-[#9ECD1D]/20" highlight />
                 <MetricCard title="Alunos Ativos" value={stats.ativos} icon={<Users size={18}/>} color="border-zinc-800" />
@@ -212,7 +219,6 @@ export default function AdminDashboard() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* LADO ESQUERDO: GRÁFICO E PRESENÇA */}
                 <div className="lg:col-span-2 space-y-8">
                     <section className="bg-zinc-900/40 border border-zinc-800/50 p-6 rounded-[2.5rem]">
                         <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2 mb-6">
@@ -230,7 +236,13 @@ export default function AdminDashboard() {
                                     <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.2} />
                                     <XAxis dataKey="hora" stroke="#52525b" fontSize={11} axisLine={false} tickLine={false} />
                                     <Tooltip contentStyle={{ backgroundColor: '#09090b', border: 'none', borderRadius: '12px' }} />
-                                    <Area type="monotone" dataKey="visitas" stroke="#9ECD1D" strokeWidth={3} fill="url(#colorVis)" />
+                                    <Area 
+                                        type="monotone" 
+                                        dataKey="visitas" 
+                                        stroke="#9ECD1D" 
+                                        strokeWidth={3} 
+                                        fill="url(#colorVis)" 
+                                    />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
@@ -257,9 +269,7 @@ export default function AdminDashboard() {
                     </section>
                 </div>
 
-                {/* LADO DIREITO: ALERTAS E RISCOS */}
                 <div className="space-y-6">
-                    {/* ALERTA DE EVASÃO */}
                     <section className="bg-red-500/5 border border-red-500/20 p-6 rounded-[2.5rem]">
                         <h3 className="text-sm font-bold uppercase tracking-widest text-red-500 mb-6 flex items-center gap-2">
                             <UserX size={16} /> Risco de Abandono
@@ -279,7 +289,6 @@ export default function AdminDashboard() {
                         </div>
                     </section>
 
-                    {/* COBRANÇA */}
                     <section className="bg-zinc-900/40 border border-zinc-800/50 p-6 rounded-[2.5rem]">
                         <h3 className="text-sm font-bold uppercase tracking-widest text-[#9ECD1D] mb-6 flex items-center gap-2">
                             <Info size={16} /> Ações Requeridas
