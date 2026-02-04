@@ -3,8 +3,8 @@ import { supabaseAdmin } from '@/src/lib/supabase'; // Certifique-se que este us
 import Stripe from 'stripe';
 import { headers } from 'next/headers';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { 
-  apiVersion: '2023-10-16' as any 
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2023-10-16' as any
 });
 
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
         break;
       }
 
-      // EVENTO: Assinatura deletada (Cancelamento imediato ou fim do ciclo)
+      // Este evento dispara no minuto exato em que o período pago acaba
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
         const customer = await stripe.customers.retrieve(subscription.customer as string);
@@ -63,27 +63,33 @@ export async function POST(req: Request) {
         break;
       }
 
-      // EVENTO: Atualizações de Status (Onde a mágica acontece)
+      // EVENTO: Atualização de assinatura (Controle de ciclo de vida)
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
         const customer = await stripe.customers.retrieve(subscription.customer as string);
         const email = (customer as Stripe.Customer).email;
 
         if (email) {
-          // Lógica Blindada:
-          // Se o status for 'unpaid' (não pago após tentativas) ou 'canceled' (cancelado manualmente no painel)
-          const deveBloquear = 
-            subscription.status === 'canceled' || 
-            subscription.status === 'unpaid';
+          // LÓGICA DE RESPEITO AO PERÍODO PAGO:
 
-          if (deveBloquear) {
+          if (subscription.status === 'canceled' || subscription.status === 'unpaid') {
+            // Se o status mudou para cancelado ou não pago, bloqueia.
             await atualizarStatus(email, 'inativo');
-          } else if (subscription.status === 'active') {
-            // Se ele estava pendente e pagou, volta a ser ativo
+          }
+          else if (subscription.cancel_at_period_end === true) {
+            // O aluno cancelou, mas ainda tem dias pagos.
+            // MANTEMOS COMO ATIVO para ele continuar treinando até o fim do ciclo.
+            console.log(`ℹ️ Aluno ${email} cancelou, mas tem acesso até o fim do período.`);
             await atualizarStatus(email, 'ativo');
           }
-          // Note: Se estiver 'past_due' (atrasado), o código mantém o status atual 
-          // ou você pode mudar para 'pendente' se quiser barrar na hora.
+          else if (subscription.status === 'active') {
+            // Assinatura normal e saudável
+            await atualizarStatus(email, 'ativo');
+          }
+          else if (subscription.status === 'past_due') {
+            // Pagamento atrasado (tentando cobrar), status vira pendente
+            await atualizarStatus(email, 'pendente');
+          }
         }
         break;
       }

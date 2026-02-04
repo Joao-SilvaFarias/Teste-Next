@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import {
     CheckCircle, XCircle, Activity, TrendingUp, Loader2,
     MessageCircle, DollarSign, Clock, LogOut, Users,
-    Search, FileDown, UserX, Zap, Info
+    Search, FileDown, UserX, Zap, Info, Camera
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, CartesianGrid,
@@ -54,8 +54,23 @@ export default function DashboardContent() {
     const [isMounted, setIsMounted] = useState(false);
     const [termoPesquisa, setTermoPesquisa] = useState('');
     const [agoraParaTimer, setAgoraParaTimer] = useState(new Date());
+    const [showModalEncerrar, setShowModalEncerrar] = useState(false);
+    const [encerrando, setEncerrando] = useState(false);
 
-    // Atualiza os timers de treino a cada minuto
+    const confirmarEncerrarDia = async () => {
+        setEncerrando(true);
+        try {
+            const { error } = await supabase.rpc('realizar_auto_checkout');
+            if (error) throw error;
+            buscarPresentes();
+            setShowModalEncerrar(false);
+        } catch (error: any) {
+            alert("Erro ao encerrar dia: " + error.message);
+        } finally {
+            setEncerrando(false);
+        }
+    };
+
     useEffect(() => {
         const timer = setInterval(() => setAgoraParaTimer(new Date()), 60000);
         return () => clearInterval(timer);
@@ -142,7 +157,6 @@ export default function DashboardContent() {
         }
     }, [authLoading, isAdmin, carregarDadosGerais, buscarPresentes]);
 
-    // Inteligência: Horário de Pico
     const horarioPico = useMemo(() => {
         if (dadosGrafico.length === 0) return "--:--";
         const maior = [...dadosGrafico].sort((a, b) => b.visitas - a.visitas)[0];
@@ -190,17 +204,59 @@ export default function DashboardContent() {
         }]);
     };
 
-    const encerrarDia = async () => {
-        if (!confirm("Isso fará o checkout de todos os alunos ainda presentes. Confirmar?")) return;
-        const { error } = await supabase.rpc('realizar_auto_checkout');
-        if (error) alert("Erro ao encerrar dia: " + error.message);
-        else { alert("Dia encerrado!"); buscarPresentes(); }
-    };
-
     if (authLoading || carregandoDados || !isMounted) return <DashboardSkeleton />;
 
     return (
         <div className="min-h-screen bg-zinc-950 text-white p-4 md:p-8 pb-32 font-sans animate-in fade-in duration-700">
+            
+            {/* BOTÃO FLUTUANTE DE ACESSO RÁPIDO À CÂMERA */}
+            <button
+                onClick={() => router.push('/admin/recepcao')}
+                className="fixed bottom-8 right-8 z-[90] w-16 h-16 bg-[#9ECD1D] text-black rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(158,205,29,0.4)] hover:scale-110 active:scale-95 transition-all border-4 border-zinc-950 group"
+            >
+                <Camera size={28} />
+                <span className="absolute right-20 bg-zinc-900 text-[#9ECD1D] px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border border-zinc-800 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                    Scanner Facial
+                </span>
+            </button>
+
+            {/* Modal de Confirmação Personalizado */}
+            {showModalEncerrar && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md p-8 rounded-[3rem] shadow-2xl scale-in-center">
+                        <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center text-red-500 mb-6 mx-auto">
+                            <LogOut size={32} />
+                        </div>
+
+                        <h2 className="text-2xl font-black italic uppercase tracking-tighter text-center mb-2">
+                            Encerrar <span className="text-red-500">Operação?</span>
+                        </h2>
+
+                        <p className="text-zinc-400 text-sm text-center mb-8 leading-relaxed">
+                            Esta ação realizará o <span className="text-white font-bold">checkout automático</span> de todos os <span className="text-white font-bold">{presentes.length} alunos</span> presentes agora. Use apenas ao fechar a academia.
+                        </p>
+
+                        <div className="flex flex-col gap-3">
+                            <button
+                                onClick={confirmarEncerrarDia}
+                                disabled={encerrando}
+                                className="w-full bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-black py-4 rounded-2xl uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2"
+                            >
+                                {encerrando ? <Loader2 className="animate-spin" size={16} /> : "Confirmar Encerramento"}
+                            </button>
+
+                            <button
+                                onClick={() => setShowModalEncerrar(false)}
+                                disabled={encerrando}
+                                className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 font-bold py-4 rounded-2xl uppercase tracking-widest text-xs transition-all"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
                     <span className="px-2 py-0.5 bg-[#9ECD1D]/10 text-[#9ECD1D] text-[10px] font-bold rounded-full uppercase tracking-widest border border-[#9ECD1D]/20 mb-2 inline-block">Admin Mode</span>
@@ -208,7 +264,8 @@ export default function DashboardContent() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                    <button onClick={encerrarDia} className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-4 py-2.5 rounded-2xl font-bold text-xs text-red-500 hover:bg-red-500 hover:text-white transition-all">
+
+                    <button onClick={() => setShowModalEncerrar(true)} className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-4 py-2.5 rounded-2xl font-bold text-xs text-red-500 hover:bg-red-500 hover:text-white transition-all">
                         <LogOut size={16} /> Encerrar Dia
                     </button>
                     <button onClick={gerarPDF} className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-4 py-2.5 rounded-2xl font-bold text-xs hover:bg-zinc-800 transition-all text-zinc-400">
