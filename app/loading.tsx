@@ -1,5 +1,5 @@
-import PageSkeleton from '@/components/PageSkeleton';
+import HomeSkeleton from "@/components/HomeSkeleton";
 
-export default function Loading() {
-  return <PageSkeleton />;
+export default function Loading(){
+    return <HomeSkeleton />
 }

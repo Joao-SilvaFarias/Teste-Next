@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/context/AuthContext'; // Importando o contexto
+import HomeSkeleton from '@/components/HomeSkeleton';
 
-export default function LandingPage() {
+export default function Page() {
   const { user, isAdmin, loading: authLoading } = useAuth(); // Consumindo o estado global
 
   const [email, setEmail] = useState('');
@@ -55,18 +56,11 @@ export default function LandingPage() {
     }
   }
 
-  // Enquanto o contexto decide se o user está logado ou não
   if (authLoading) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-[#9ECD1D] animate-spin" />
-      </div>
-    );
+    return <HomeSkeleton />
   }
-
   return (
     <div className="bg-zinc-950 text-white selection:bg-[#9ECD1D] selection:text-black">
-
       {/* --- MODAL DE SENHA --- */}
       {showAuth && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">

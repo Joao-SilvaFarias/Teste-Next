@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { supabase } from '@/src/lib/supabase';
 import { Lock, Mail, CreditCard, LogOut, Loader2 } from 'lucide-react';
 import { useAuth } from '@/src/context/AuthContext';
+import HomeSkeleton from '@/components/HomeSkeleton';
+import LoginSkeleton from '@/components/LoginSkeleton';
 
 export default function PerfilAluno() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -59,9 +61,7 @@ const [loadingPortal, setLoadingPortal] = useState(false);
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-[#9ECD1D] animate-spin" />
-      </div>
+      <LoginSkeleton/>
     );
   }
 

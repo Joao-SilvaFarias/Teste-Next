@@ -1,4 +1,5 @@
-'use client';
+"use client"
+
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/context/AuthContext';
@@ -15,8 +16,8 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import PageSkeleton from '@/components/PageSkeleton';
+import DashboardSkeleton from '@/components/DashboardSkeleton';
 
-// --- INTERFACES ---
 interface Aluno {
     nome: string;
     email: string;
@@ -37,7 +38,7 @@ interface AlunoPresente {
     tipo: string;
 }
 
-export default function AdminDashboard() {
+export default function DashboardContent() {
     const { isAdmin, loading: authLoading, user } = useAuth();
     const router = useRouter();
 
@@ -196,7 +197,7 @@ export default function AdminDashboard() {
         else { alert("Dia encerrado!"); buscarPresentes(); }
     };
 
-    if (authLoading || carregandoDados || !isMounted) return <PageSkeleton />;
+    if (authLoading || carregandoDados || !isMounted) return <DashboardSkeleton />;
 
     return (
         <div className="min-h-screen bg-zinc-950 text-white p-4 md:p-8 pb-32 font-sans animate-in fade-in duration-700">

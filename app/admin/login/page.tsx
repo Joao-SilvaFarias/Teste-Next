@@ -37,15 +37,6 @@ export default function AdminLogin() {
     // pois o useEffect acima detectará a mudança de isAdmin e redirecionará.
   }
 
-  // Enquanto verifica se o user já está logado
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-[#9ECD1D] animate-spin" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
       <div className="max-w-md w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
