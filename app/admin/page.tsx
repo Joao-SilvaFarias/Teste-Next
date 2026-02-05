@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import {
     CheckCircle, XCircle, Activity, TrendingUp, Loader2,
     MessageCircle, DollarSign, Clock, LogOut, Users,
-    Search, FileDown, UserX, Zap, Info, Camera
+    Search, FileDown, UserX, Zap, Info, Camera, AlertCircle
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, CartesianGrid,
@@ -15,7 +15,6 @@ import {
 } from 'recharts';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import PageSkeleton from '@/components/PageSkeleton';
 import DashboardSkeleton from '@/components/DashboardSkeleton';
 
 interface Aluno {
@@ -38,6 +37,36 @@ interface AlunoPresente {
     tipo: string;
 }
 
+// --- COMPONENTE DE MÉTRICA REFORMULADO ---
+function MetricCard({ title, value, icon, color, highlight, description, alert }: any) {
+    return (
+        <div className={`bg-zinc-900/40 border ${color} p-6 rounded-[2rem] flex flex-col justify-between hover:scale-[1.02] transition-all group relative overflow-hidden`}>
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col">
+                    <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-1">{title}</p>
+                    <p className={`text-2xl font-black italic tracking-tighter ${highlight ? "text-[#9ECD1D]" : "text-white"}`}>
+                        {value}
+                    </p>
+                </div>
+                <div className={`p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/50 ${highlight ? "text-[#9ECD1D]" : "text-zinc-400"}`}>
+                    {icon}
+                </div>
+            </div>
+            
+            <div className="flex items-center gap-1.5 mt-2 border-t border-zinc-800/50 pt-3">
+                {alert ? (
+                    <AlertCircle size={10} className="text-red-500" />
+                ) : (
+                    <Info size={10} className="text-zinc-600" />
+                )}
+                <p className={`text-[9px] font-medium leading-tight uppercase tracking-tight ${alert ? "text-red-400" : "text-zinc-500"}`}>
+                    {description}
+                </p>
+            </div>
+        </div>
+    );
+}
+
 export default function DashboardContent() {
     const { isAdmin, loading: authLoading, user } = useAuth();
     const router = useRouter();
@@ -57,31 +86,7 @@ export default function DashboardContent() {
     const [showModalEncerrar, setShowModalEncerrar] = useState(false);
     const [encerrando, setEncerrando] = useState(false);
 
-    const confirmarEncerrarDia = async () => {
-        setEncerrando(true);
-        try {
-            const { error } = await supabase.rpc('realizar_auto_checkout');
-            if (error) throw error;
-            buscarPresentes();
-            setShowModalEncerrar(false);
-        } catch (error: any) {
-            alert("Erro ao encerrar dia: " + error.message);
-        } finally {
-            setEncerrando(false);
-        }
-    };
-
-    useEffect(() => {
-        const timer = setInterval(() => setAgoraParaTimer(new Date()), 60000);
-        return () => clearInterval(timer);
-    }, []);
-
-    useEffect(() => { setIsMounted(true); }, []);
-
-    useEffect(() => {
-        if (!authLoading && !isAdmin) router.replace('/');
-    }, [isAdmin, authLoading, router]);
-
+    // FUNÇÕES DE BUSCA
     const buscarPresentes = useCallback(async () => {
         const { data } = await supabase.from('alunos_presentes').select('*');
         setPresentes(data || []);
@@ -144,24 +149,64 @@ export default function DashboardContent() {
         }
     }, [user?.email]);
 
+    // REALTIME ATUALIZADO
     useEffect(() => {
         if (!authLoading && isAdmin) {
             carregarDadosGerais();
             buscarPresentes();
-            const canal = supabase.channel('admin-changes')
-                .on('postgres_changes', { event: '*', table: 'checkins', schema: 'public' }, () => {
+
+            const canal = supabase
+                .channel('admin-dashboard-realtime')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'checkins' }, () => {
                     buscarPresentes();
                     carregarDadosGerais();
-                }).subscribe();
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'alunos' }, () => {
+                    carregarDadosGerais();
+                })
+                .subscribe();
+
             return () => { supabase.removeChannel(canal); };
         }
     }, [authLoading, isAdmin, carregarDadosGerais, buscarPresentes]);
+
+    // TIMERS E MONTAGEM
+    useEffect(() => {
+        const timer = setInterval(() => setAgoraParaTimer(new Date()), 60000);
+        return () => clearInterval(timer);
+    }, []);
+
+    useEffect(() => { setIsMounted(true); }, []);
+
+    useEffect(() => {
+        if (!authLoading && !isAdmin) router.replace('/');
+    }, [isAdmin, authLoading, router]);
+
+    // LÓGICA DE NEGÓCIO
+    const confirmarEncerrarDia = async () => {
+        setEncerrando(true);
+        try {
+            const { error } = await supabase.rpc('realizar_auto_checkout');
+            if (error) throw error;
+            buscarPresentes();
+            setShowModalEncerrar(false);
+        } catch (error: any) {
+            alert("Erro ao encerrar dia: " + error.message);
+        } finally {
+            setEncerrando(false);
+        }
+    };
 
     const horarioPico = useMemo(() => {
         if (dadosGrafico.length === 0) return "--:--";
         const maior = [...dadosGrafico].sort((a, b) => b.visitas - a.visitas)[0];
         return maior?.visitas > 0 ? maior.hora : "--:--";
     }, [dadosGrafico]);
+
+    const lotacaoPercentual = useMemo(() => {
+        const limite = 50; // Limite arbitrário para exemplo
+        return Math.min(Math.round((presentes.length / limite) * 100), 100);
+    }, [presentes]);
 
     const presentesFiltrados = useMemo(() => {
         return presentes.filter(a => a.aluno_nome.toLowerCase().includes(termoPesquisa.toLowerCase()));
@@ -209,7 +254,6 @@ export default function DashboardContent() {
     return (
         <div className="min-h-screen bg-zinc-950 text-white p-4 md:p-8 pb-32 font-sans animate-in fade-in duration-700">
             
-            {/* BOTÃO FLUTUANTE DE ACESSO RÁPIDO À CÂMERA */}
             <button
                 onClick={() => router.push('/admin/recepcao')}
                 className="fixed bottom-8 right-8 z-[90] w-16 h-16 bg-[#9ECD1D] text-black rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(158,205,29,0.4)] hover:scale-110 active:scale-95 transition-all border-4 border-zinc-950 group"
@@ -220,22 +264,18 @@ export default function DashboardContent() {
                 </span>
             </button>
 
-            {/* Modal de Confirmação Personalizado */}
             {showModalEncerrar && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
                     <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md p-8 rounded-[3rem] shadow-2xl scale-in-center">
                         <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center text-red-500 mb-6 mx-auto">
                             <LogOut size={32} />
                         </div>
-
                         <h2 className="text-2xl font-black italic uppercase tracking-tighter text-center mb-2">
                             Encerrar <span className="text-red-500">Operação?</span>
                         </h2>
-
                         <p className="text-zinc-400 text-sm text-center mb-8 leading-relaxed">
                             Esta ação realizará o <span className="text-white font-bold">checkout automático</span> de todos os <span className="text-white font-bold">{presentes.length} alunos</span> presentes agora. Use apenas ao fechar a academia.
                         </p>
-
                         <div className="flex flex-col gap-3">
                             <button
                                 onClick={confirmarEncerrarDia}
@@ -244,7 +284,6 @@ export default function DashboardContent() {
                             >
                                 {encerrando ? <Loader2 className="animate-spin" size={16} /> : "Confirmar Encerramento"}
                             </button>
-
                             <button
                                 onClick={() => setShowModalEncerrar(false)}
                                 disabled={encerrando}
@@ -264,7 +303,6 @@ export default function DashboardContent() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-
                     <button onClick={() => setShowModalEncerrar(true)} className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-4 py-2.5 rounded-2xl font-bold text-xs text-red-500 hover:bg-red-500 hover:text-white transition-all">
                         <LogOut size={16} /> Encerrar Dia
                     </button>
@@ -282,11 +320,53 @@ export default function DashboardContent() {
                 </div>
             </header>
 
+            {/* QUICK INSIGHTS BAR */}
+            <div className="flex flex-wrap gap-4 mb-8">
+                <div className="bg-zinc-900/80 border border-zinc-800 px-4 py-2 rounded-2xl flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${lotacaoPercentual > 80 ? 'bg-red-500' : 'bg-[#9ECD1D]'}`} />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                        Lotação: {lotacaoPercentual}%
+                    </span>
+                </div>
+                <div className="bg-zinc-900/80 border border-zinc-800 px-4 py-2 rounded-2xl flex items-center gap-2">
+                    <Zap size={12} className="text-yellow-500" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                        Pico esperado: {horarioPico}
+                    </span>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <MetricCard title="Receita Prevista" value={`R$ ${(stats.ativos * 129).toLocaleString()}`} icon={<DollarSign size={18} />} color="border-[#9ECD1D]/20" highlight />
-                <MetricCard title="Alunos Ativos" value={stats.ativos} icon={<Users size={18} />} color="border-zinc-800" />
-                <MetricCard title="Horário de Pico" value={horarioPico} icon={<Clock size={18} />} color="border-zinc-800" />
-                <MetricCard title="Taxa de Churn" value={`${stats.churnRate}%`} icon={<TrendingUp size={18} />} color="border-red-500/10" />
+                <MetricCard 
+                    title="Receita Prevista" 
+                    value={`R$ ${(stats.ativos * 129).toLocaleString()}`} 
+                    icon={<DollarSign size={18} />} 
+                    color="border-[#9ECD1D]/20" 
+                    highlight 
+                    description="Expectativa mensal baseada nos planos ativos (R$129/mês)."
+                />
+                <MetricCard 
+                    title="Alunos Ativos" 
+                    value={stats.ativos} 
+                    icon={<Users size={18} />} 
+                    color="border-zinc-800" 
+                    description="Membros com acesso liberado e mensalidade em dia."
+                />
+                <MetricCard 
+                    title="Horário de Pico" 
+                    value={horarioPico} 
+                    icon={<Clock size={18} />} 
+                    color="border-zinc-800" 
+                    description="Momento de maior lotação registrado nas últimas 24h."
+                />
+                <MetricCard 
+                    title="Taxa de Churn" 
+                    value={`${stats.churnRate}%`} 
+                    icon={<TrendingUp size={18} />} 
+                    color={Number(stats.churnRate) > 15 ? "border-red-500/20" : "border-zinc-800"}
+                    alert={Number(stats.churnRate) > 15}
+                    description="Percentual de evasão de alunos sobre o total da base."
+                />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -336,8 +416,11 @@ export default function DashboardContent() {
                                             </div>
                                             <div>
                                                 <p className="text-sm font-bold uppercase italic leading-none mb-1">{aluno.aluno_nome}</p>
-                                                <p className="text-[9px] text-zinc-500 font-medium uppercase tracking-tighter italic">
-                                                    Há {tempoPermanencia} min treinando
+                                                <p className={`text-[9px] font-medium uppercase tracking-tighter italic ${
+                                                    tempoPermanencia > 90 ? "text-red-400" : 
+                                                    tempoPermanencia > 60 ? "text-yellow-400" : "text-zinc-500"
+                                                }`}>
+                                                    {tempoPermanencia > 120 ? "⚠️ Revisar saída" : `Há ${tempoPermanencia} min treinando`}
                                                 </p>
                                             </div>
                                         </div>
@@ -391,18 +474,6 @@ export default function DashboardContent() {
                     </section>
                 </div>
             </div>
-        </div>
-    );
-}
-
-function MetricCard({ title, value, icon, color, highlight }: any) {
-    return (
-        <div className={`bg-zinc-900/40 border ${color} p-6 rounded-[2rem] flex items-center justify-between hover:scale-[1.02] transition-transform`}>
-            <div>
-                <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-1">{title}</p>
-                <p className={`text-2xl font-black italic tracking-tighter ${highlight ? "text-[#9ECD1D]" : "text-white"}`}>{value}</p>
-            </div>
-            <div className="p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/50 text-zinc-400">{icon}</div>
         </div>
     );
 }
