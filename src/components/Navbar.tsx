@@ -11,8 +11,7 @@ import {
   LogIn,
   LogOut,
   ChevronUp,
-  ShieldCheck,
-  Zap // Ícone para o Check-in Rápido
+  ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '@/src/context/AuthContext';
 import { supabase } from '@/src/lib/supabase';
@@ -83,12 +82,12 @@ export default function Navbar() {
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-zinc-900 border border-zinc-800 p-2 rounded-2xl shadow-2xl z-[101] flex flex-col gap-1 min-w-[180px] animate-in fade-in zoom-in slide-in-from-bottom-4 duration-200">
           <div className="px-3 py-2 text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] border-b border-zinc-800 mb-1">Gestão Interna</div>
           <AdminSubLink href="/admin/recepcao" icon={<Camera size={18} />} label="Portaria" active={pathname === '/admin/recepcao'} />
-          <AdminSubLink href="/admin" icon={<LayoutDashboard size={18} />} label="Painel Geral" active={pathname === '/admin'} />
+          <AdminSubLink href="/admin/dashboard" icon={<LayoutDashboard size={18} />} label="Painel Geral" active={pathname === '/admin/dashboard'} />
         </div>
       )}
 
       {/* --- NAVBAR PRINCIPAL --- */}
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-950/80 backdrop-blur-xl border border-white/10 px-5 sm:px-8 py-3 rounded-[2.5rem] flex items-center gap-5 sm:gap-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[100] w-[95%] max-w-fit animate-in fade-in zoom-in duration-500">
+      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-950/80 backdrop-blur-xl border border-white/10 px-6 py-3 rounded-[2.5rem] flex items-center gap-6 sm:gap-10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[100] w-auto animate-in fade-in zoom-in duration-500">
         
         {/* Lotação */}
         <div className="flex flex-col items-center gap-0.5 border-r border-white/10 pr-4">
@@ -101,19 +100,6 @@ export default function Navbar() {
 
         {/* Home */}
         <NavLink href="/" active={pathname === '/'} icon={<Home size={20} />} label="Início" />
-
-        {/* BOTÃO CENTRAL DE CHECK-IN (Aparece apenas para alunos logados) */}
-        {user && !isAdmin && (
-          <div className="relative -top-5">
-            <Link 
-              href="/checkin" 
-              className="bg-[#9ECD1D] text-black w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(158,205,29,0.3)] hover:scale-110 active:scale-95 transition-all duration-300 border-[4px] border-zinc-950 group"
-            >
-              <Zap size={24} className="fill-current" />
-            </Link>
-            <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[7px] font-black uppercase text-[#9ECD1D] tracking-tighter whitespace-nowrap">Check-in</span>
-          </div>
-        )}
 
         {user ? (
           <>
@@ -135,7 +121,7 @@ export default function Navbar() {
               active={pathname === '/perfil'} 
               icon={<CreditCard size={20} />} 
               label="Conta" 
-              hasBadge={temNotificacao} // Passa o estado do badge
+              hasBadge={temNotificacao} 
             />
 
             <button onClick={signOut} className="text-zinc-500 hover:text-red-500 flex flex-col items-center gap-1 transition-all group">
@@ -153,6 +139,8 @@ export default function Navbar() {
     </>
   );
 }
+
+// --- SUB-COMPONENTES AUXILIARES ---
 
 function NavLink({ href, active, icon, label, hasBadge }: any) {
   return (
@@ -179,8 +167,8 @@ function AdminSubLink({ href, icon, label, active }: any) {
 
 function NavbarSkeleton() {
   return (
-    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-950/50 backdrop-blur-xl border border-white/5 px-8 py-4 rounded-[2.5rem] flex items-center gap-8 shadow-xl z-[100] w-[92%] max-w-fit">
-      {[1, 2, 3, 4].map((i) => (
+    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-950/50 backdrop-blur-xl border border-white/5 px-8 py-4 rounded-[2.5rem] flex items-center gap-8 shadow-xl z-[100] w-auto">
+      {[1, 2, 3].map((i) => (
         <div key={i} className="flex flex-col items-center gap-2 animate-pulse">
           <div className="w-5 h-5 bg-zinc-800 rounded-lg" />
           <div className="w-7 h-1.5 bg-zinc-900 rounded-full" />

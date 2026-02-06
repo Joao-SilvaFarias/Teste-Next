@@ -1,17 +1,21 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Archivo } from 'next/font/google';
 import "./globals.css";
-import Navbar from "@/components/Navbar";
+import Navbar from "@/src/components/Navbar";
 import { AuthProvider } from "@/src/context/AuthContext";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+// Fonte para leitura e textos corridos
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter'
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+// Fonte para títulos e botões (estilo Smart)
+const archivo = Archivo({
+  subsets: ['latin'],
+  weight: ['400', '700', '900'],
+  style: ['normal', 'italic'],
+  variable: '--font-archivo',
 });
 
 export const metadata: Metadata = {
@@ -27,7 +31,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${inter.variable} ${archivo.variable}`}
       >
         <AuthProvider>
           {children}

@@ -49,7 +49,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    window.location.href = '/'; // Garante limpeza total
   };
 
   const isAdmin = perfil?.role === 'admin' || perfil?.role === 'aluno_admin';
