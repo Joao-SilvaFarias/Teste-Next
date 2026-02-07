@@ -82,7 +82,7 @@ export default function Navbar() {
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-zinc-900 border border-zinc-800 p-2 rounded-2xl shadow-2xl z-[101] flex flex-col gap-1 min-w-[180px] animate-in fade-in zoom-in slide-in-from-bottom-4 duration-200">
           <div className="px-3 py-2 text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] border-b border-zinc-800 mb-1">Gestão Interna</div>
           <AdminSubLink href="/admin/recepcao" icon={<Camera size={18} />} label="Portaria" active={pathname === '/admin/recepcao'} />
-          <AdminSubLink href="/admin/dashboard" icon={<LayoutDashboard size={18} />} label="Painel Geral" active={pathname === '/admin/dashboard'} />
+          <AdminSubLink href="/admin" icon={<LayoutDashboard size={18} />} label="Painel Geral" active={pathname === '/admin'} />
         </div>
       )}
 
