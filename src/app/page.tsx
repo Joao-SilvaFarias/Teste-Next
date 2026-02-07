@@ -11,6 +11,7 @@ export default function Page() {
   const { user, isAdmin, loading: authLoading } = useAuth();
 
   const [email, setEmail] = useState('');
+  const [nome, setNome] = useState('');
   const [password, setPassword] = useState('');
   const [showAuth, setShowAuth] = useState(false);
   const [selectedPriceId, setSelectedPriceId] = useState('');
@@ -36,16 +37,28 @@ export default function Page() {
   async function finalizarContratacao() {
     setLoading(true);
     try {
-      const { error: authError } = await supabase.auth.signUp({ email, password });
+      // 1. Criar o utilizador no Auth com o nome nos metadados
+      const { error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: nome, // Guarda o nome aqui para acesso rápido via useAuth
+          }
+        }
+      });
+
       if (authError) throw authError;
 
+      // 2. Inserir na tabela de alunos (BD) para gestão administrativa
       await supabase.from('alunos').insert([{
-        nome: email.split('@')[0],
+        nome: nome,
         email: email,
         status_assinatura: 'pendente',
         role: 'aluno'
       }]);
 
+      // 3. Chamar o Checkout do Stripe
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -56,7 +69,7 @@ export default function Page() {
       if (data.url) window.location.href = data.url;
 
     } catch (err: any) {
-      alert(err.message || "Erro ao processar.");
+      alert(err.message || "Erro ao processar o registo.");
     } finally {
       setLoading(false);
     }
@@ -66,32 +79,45 @@ export default function Page() {
 
   return (
     <div className="bg-zinc-950 text-white selection:bg-[#9ECD1D] selection:text-black min-h-screen font-sans">
-      
+
       {/* --- MODAL DE SENHA PADRONIZADO --- */}
       {showAuth && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-zinc-900 border border-zinc-800 p-10 rounded-[2.5rem] max-w-sm w-full shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-[#9ECD1D]/10 rounded-full blur-3xl -mr-12 -mt-12" />
-            
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md">
+          <div className="bg-zinc-900 border border-zinc-800 p-10 rounded-[2.5rem] max-w-sm w-full shadow-2xl relative">
             <h2 className="text-3xl font-smart-title mb-2 italic">Último Passo!</h2>
-            <p className="text-zinc-500 text-[10px] font-smart-detail mb-8">Crie sua senha de acesso</p>
+            <p className="text-zinc-500 text-[10px] font-smart-detail mb-8">Complete seus dados de acesso</p>
 
             <form onSubmit={(e) => { e.preventDefault(); finalizarContratacao(); }} className="space-y-4">
+
+              {/* NOVO CAMPO DE NOME */}
+              <div className="relative group">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within:text-[#9ECD1D] transition-colors" size={18} />
+                <input
+                  required
+                  type="text"
+                  placeholder="SEU NOME COMPLETO"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  className={styles.input}
+                />
+              </div>
+
               <div className="relative group">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within:text-[#9ECD1D] transition-colors" size={18} />
                 <input type="email" disabled value={email} className="w-full bg-black/50 border border-zinc-800 rounded-2xl pl-12 pr-4 py-4 text-zinc-600 cursor-not-allowed text-xs font-bold font-sans" />
               </div>
+
               <div className="relative group">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within:text-[#9ECD1D] transition-colors" size={18} />
-                <input required autoFocus type="password" placeholder="SUA SENHA" onChange={(e) => setPassword(e.target.value)} className={styles.input} />
+                <input required type="password" placeholder="CRIE UMA SENHA" onChange={(e) => setPassword(e.target.value)} className={styles.input} />
               </div>
 
-              <button type="submit" disabled={loading || password.length < 6} className={`${styles.buttonPrimary} w-full mt-4`}>
+              <button type="submit" disabled={loading || password.length < 6 || !nome} className={`${styles.buttonPrimary} w-full mt-4`}>
                 {loading ? <Loader2 className="animate-spin" /> : 'Pagar e Ativar'}
                 <ArrowRight size={16} />
               </button>
             </form>
-            <button onClick={() => setShowAuth(false)} className="w-full mt-6 text-zinc-700 text-[9px] font-smart-detail hover:text-white transition-colors">Cancelar</button>
+            {/* ... botão cancelar */}
           </div>
         </div>
       )}
@@ -99,8 +125,8 @@ export default function Page() {
       {/* --- HERO SECTION --- */}
       <section className="relative min-h-screen flex flex-col items-center justify-center px-6 text-center overflow-hidden">
         {/* Glow de fundo */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#9ECD1D]/5 rounded-full blur-[120px] pointer-events-none" />
-        
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full blur-[120px] pointer-events-none" />
+
         <div className="max-w-5xl relative">
           <p className="font-smart-detail text-[#9ECD1D] text-xs mb-6 animate-in slide-in-from-top-4 duration-700">Bem-vindo à nova era</p>
           <h1 className="text-6xl md:text-[10rem] font-smart-title mb-10 leading-[0.8] tracking-tighter">
@@ -174,8 +200,8 @@ export default function Page() {
       <footer className="py-24 border-t border-zinc-900 flex flex-col items-center gap-8 text-zinc-700 bg-black">
         <h2 className="font-smart-title text-2xl grayscale opacity-50 tracking-tighter">SMART<span className="text-white">FIT</span></h2>
         <div className="flex flex-col items-center gap-2">
-           <p className="font-smart-detail text-[9px] uppercase tracking-[0.3em]">© 2026 Tecnologia Biométrica AI.</p>
-           <Link href="/admin/login" className="hover:text-[#9ECD1D] text-[9px] font-smart-detail transition-colors underline underline-offset-4">Acesso Staff</Link>
+          <p className="font-smart-detail text-[9px] uppercase tracking-[0.3em]">© 2026 Tecnologia Biométrica AI.</p>
+          <Link href="/admin/login" className="hover:text-[#9ECD1D] text-[9px] font-smart-detail transition-colors underline underline-offset-4">Acesso Staff</Link>
         </div>
       </footer>
     </div>

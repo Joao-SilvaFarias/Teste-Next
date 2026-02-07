@@ -101,7 +101,7 @@ export default function AdminLogin() {
           <button
             type="submit"
             disabled={loadingInterno || authLoading}
-            className="w-full bg-[#9ECD1D] text-black font-black py-5 rounded-2xl hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 uppercase text-sm tracking-widest disabled:opacity-50 mt-4 shadow-[0_10px_20px_-5px_rgba(158,205,29,0.3)]"
+            className="w-full bg-[#9ECD1D] text-black font-black py-5 rounded-2xl hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 uppercase text-sm tracking-widest disabled:opacity-50 mt-4"
           >
             {loadingInterno ? (
               <Loader2 className="animate-spin w-6 h-6" />

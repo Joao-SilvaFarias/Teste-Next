@@ -25,7 +25,7 @@ export default function PerfilAluno() {
   const styles = {
     card: "bg-zinc-900 border border-zinc-800 rounded-[2.5rem]",
     input: "w-full bg-black border border-zinc-800 rounded-2xl pl-12 pr-4 py-4 focus:border-[#9ECD1D] outline-none transition-all placeholder:text-zinc-800 text-[10px] font-smart-detail",
-    buttonPrimary: "w-full bg-[#9ECD1D] flex justify-center items-center cursor-pointer text-black font-smart-detail py-5 rounded-2xl mt-6 hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 uppercase text-[10px] shadow-2xl shadow-[#9ECD1D]/10"
+    buttonPrimary: "w-full bg-[#9ECD1D] flex justify-center items-center cursor-pointer text-black font-smart-detail py-5 rounded-2xl mt-6 hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 uppercase text-[10px]"
   };
 
   async function handleLogin(e: React.FormEvent) {
