@@ -314,7 +314,7 @@ export default function DashboardContent() {
     const horarioPico = useMemo(() => {
         if (dadosGrafico.length === 0) return "--:--";
         const maior = [...dadosGrafico].sort((a: any, b: any) => b.visitas - a.visitas)[0];
-        return maior?.visitas > 0 ? maior.hora : "--:--";
+        return maior?.visits > 0 ? maior.hora : "--:--";
     }, [dadosGrafico]);
 
     const lotacaoPercentual = useMemo(() => {
