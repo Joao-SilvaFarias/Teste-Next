@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import * as faceapi from 'face-api.js';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/context/AuthContext';
-import { Loader2, Camera, Smartphone, ShieldCheck, ArrowLeftRight, UserCheck } from 'lucide-react';
+import { Loader2, Smartphone, ShieldCheck, UserCheck, AlertCircle } from 'lucide-react';
 
 export default function RecepcaoCheckinDefinitiva() {
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -30,11 +30,11 @@ export default function RecepcaoCheckinDefinitiva() {
                     const { data } = await supabase.from('alunos')
                         .select('nome, email, face_descriptor')
                         .eq('status_assinatura', 'ativo');
-                    
+
                     setAlunosAtivos(data || []);
                     iniciarCamera();
                 } catch (err) {
-                    setMensagem('Erro Crítico de Inicialização');
+                    setMensagem('Erro de Inicialização');
                     setStatusCor('red');
                 }
             };
@@ -45,7 +45,7 @@ export default function RecepcaoCheckinDefinitiva() {
     const iniciarCamera = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user', aspectRatio: { ideal: 1.777778 } }
+                video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
             });
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
@@ -58,7 +58,6 @@ export default function RecepcaoCheckinDefinitiva() {
         }
     };
 
-    // Lógica de Movimentação (Check-in / Out)
     const processarMovimentacao = useCallback(async (aluno: any) => {
         if (estaProcessando) return;
         setEstaProcessando(true);
@@ -82,11 +81,8 @@ export default function RecepcaoCheckinDefinitiva() {
                 const diffMinutos = (agora.getTime() - dataUltimo.getTime()) / (1000 * 60);
 
                 if (diffMinutos < COOLDOWN_MINUTOS) {
-                    const resta = Math.ceil((COOLDOWN_MINUTOS - diffMinutos) * 60);
-                    setMensagem(`Aguarde ${resta}s para novo acesso`);
+                    setMensagem(`Aguarde ${Math.ceil(COOLDOWN_MINUTOS - diffMinutos)}m`);
                     setStatusCor('zinc');
-                    new Audio('https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3').play().catch(() => {});
-                    
                     setTimeout(() => {
                         setEstaProcessando(false);
                         setMensagem('Aproxime o Rosto');
@@ -96,7 +92,7 @@ export default function RecepcaoCheckinDefinitiva() {
             }
 
             const novoTipo = ultimoRegistro?.tipo === 'entrada' ? 'saida' : 'entrada';
-            
+
             await supabase.from('checkins').insert([{
                 email: aluno.email,
                 aluno_nome: aluno.nome,
@@ -104,14 +100,8 @@ export default function RecepcaoCheckinDefinitiva() {
                 data_hora: agora.toISOString()
             }]);
 
-            const greeting = novoTipo === 'entrada' ? 'BEM-VINDO' : 'ATÉ LOGO';
-            setMensagem(`${greeting}, ${aluno.nome.split(' ')[0]}!`);
+            setMensagem(`${novoTipo === 'entrada' ? 'BEM-VINDO' : 'ATÉ LOGO'}, ${aluno.nome.split(' ')[0]}!`);
             setStatusCor('green');
-
-            const sound = novoTipo === 'entrada' 
-                ? 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3' 
-                : 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3';
-            new Audio(sound).play().catch(() => {});
 
             setTimeout(() => {
                 setEstaProcessando(false);
@@ -120,19 +110,16 @@ export default function RecepcaoCheckinDefinitiva() {
             }, 5000);
 
         } catch (err) {
-            setMensagem('Erro na Sincronização');
+            setMensagem('Erro de Conexão');
             setStatusCor('red');
             setEstaProcessando(false);
         }
     }, [estaProcessando]);
 
-    // Loop de Reconhecimento
     useEffect(() => {
         if (!sistemaPronto || estaProcessando) return;
-
         const interval = setInterval(async () => {
-            if (!videoRef.current || videoRef.current.paused || estaProcessando) return;
-
+            if (!videoRef.current || estaProcessando) return;
             const detection = await faceapi
                 .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.6 }))
                 .withFaceLandmarks()
@@ -141,7 +128,6 @@ export default function RecepcaoCheckinDefinitiva() {
             if (detection) {
                 let melhorMatch = null;
                 let menorDistancia = 0.45;
-
                 for (const aluno of alunosAtivos) {
                     if (!aluno.face_descriptor) continue;
                     const descriptor = Array.isArray(aluno.face_descriptor) ? aluno.face_descriptor : Object.values(aluno.face_descriptor);
@@ -154,89 +140,90 @@ export default function RecepcaoCheckinDefinitiva() {
                 if (melhorMatch) processarMovimentacao(melhorMatch);
             }
         }, 800);
-
         return () => clearInterval(interval);
     }, [sistemaPronto, estaProcessando, alunosAtivos, processarMovimentacao]);
 
     return (
-        <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center p-6 font-sans">
-            
-            {/* Header de Identidade */}
-            <header className="mb-10 text-center animate-in fade-in slide-in-from-top duration-700">
-                <div className="flex items-center justify-center gap-3 mb-2">
-                    <UserCheck className="text-[#9ECD1D]" size={28} />
-                    <h1 className="text-4xl font-smart-title italic tracking-tighter uppercase">
+        <div className="min-h-screen bg-zinc-950 text-white flex flex-col font-sans overflow-x-hidden">
+
+            {/* Header: Adaptável Mobile-First */}
+            <header className="p-6 md:p-10 flex flex-col items-center gap-2 animate-in fade-in duration-700">
+                <div className="flex items-center gap-2">
+                    <UserCheck className="text-[#9ECD1D] w-6 h-6 md:w-8 md:h-8" />
+                    <h1 className="text-3xl md:text-5xl font-smart-title italic uppercase tracking-tighter">
                         Smart<span className="text-[#9ECD1D]">Gate</span>
                     </h1>
                 </div>
-                <p className="text-[10px] font-smart-detail font-bold uppercase tracking-[0.4em] text-zinc-600">Bio-Authentication Terminal</p>
+                <p className="text-[8px] md:text-[10px] font-smart-detail font-bold uppercase tracking-[0.3em] text-zinc-600">
+                    Terminal de Acesso Biométrico
+                </p>
             </header>
 
-            {/* Display de Status Dinâmico */}
-            <div className={`w-full max-w-xl p-8 rounded-[2.5rem] mb-8 text-center transition-all duration-500 border-b-[10px] shadow-2xl ${
-                statusCor === 'green' ? 'bg-emerald-600 border-emerald-900' :
-                statusCor === 'red' ? 'bg-red-600 border-red-900' :
-                statusCor === 'yellow' ? 'bg-yellow-500 text-black border-yellow-800' :
-                'bg-zinc-900 border-zinc-800 text-zinc-500'
-            }`}>
-                <span className="text-2xl font-smart-title italic uppercase tracking-tighter block truncate">
-                    {mensagem}
-                </span>
-            </div>
+            <main className="flex-1 flex flex-col items-center px-4 w-full max-w-4xl mx-auto">
 
-            {/* Viewfinder da Câmera */}
-            <div className="relative w-full max-w-2xl aspect-video rounded-[3rem] overflow-hidden border-[12px] border-zinc-900 bg-black shadow-2xl group">
-                <video
-                    ref={videoRef}
-                    autoPlay
-                    muted
-                    playsInline
-                    className="w-full h-full object-cover mirror"
-                />
-
-                {/* Overlay de Scanning */}
-                {sistemaPronto && !estaProcessando && (
-                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                        <div className="w-64 h-64 border-2 border-[#9ECD1D]/20 rounded-[4rem] relative">
-                            {/* Cantos Estilizados */}
-                            <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-[#9ECD1D] rounded-tl-3xl" />
-                            <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-[#9ECD1D] rounded-tr-3xl" />
-                            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-[#9ECD1D] rounded-bl-3xl" />
-                            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-[#9ECD1D] rounded-br-3xl" />
-                            
-                            <div className="absolute inset-0 bg-[#9ECD1D]/5 animate-pulse rounded-[4rem]" />
-                            <div className="absolute top-1/2 left-0 w-full h-0.5 bg-[#9ECD1D]/30 animate-scan shadow-[0_0_15px_#9ECD1D]" />
-                        </div>
-                    </div>
-                )}
-
-                {estaProcessando && (
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-20">
-                        <Loader2 className="w-16 h-16 text-[#9ECD1D] animate-spin" />
-                    </div>
-                )}
-            </div>
-
-            {/* Footer de Compliance */}
-            <footer className="mt-12 flex gap-10 opacity-20 grayscale items-center text-zinc-400">
-                <div className="flex items-center gap-2 text-[9px] font-smart-detail font-bold uppercase tracking-widest">
-                    <Smartphone size={14} /> Auto-Sync Active
+                {/* Status Bar: Mobile-First (Largura Total -> Max Width) */}
+                <div className={`w-full p-6 md:p-8 rounded-3xl md:rounded-[2.5rem] mb-6 text-center transition-all duration-500 border-b-[6px] md:border-b-[10px] shadow-2xl ${statusCor === 'green' ? 'bg-emerald-600 border-emerald-900' :
+                        statusCor === 'red' ? 'bg-red-600 border-red-900' :
+                            statusCor === 'yellow' ? 'bg-yellow-500 text-black border-yellow-800' :
+                                'bg-zinc-900 border-zinc-800 text-zinc-500'
+                    }`}>
+                    <span className="text-lg md:text-2xl font-smart-title italic uppercase block truncate">
+                        {mensagem}
+                    </span>
                 </div>
-                <div className="h-4 w-px bg-zinc-800" />
-                <div className="flex items-center gap-2 text-[9px] font-smart-detail font-bold uppercase tracking-widest">
-                    <ShieldCheck size={14} /> Neural Processing
+
+                {/* Viewfinder: Ajuste de proporção para Mobile */}
+                <div className="relative w-full aspect-[3/4] md:aspect-video rounded-3xl md:rounded-[3rem] overflow-hidden border-[6px] md:border-[12px] border-zinc-900 bg-black shadow-2xl">
+                    <video
+                        ref={videoRef}
+                        autoPlay
+                        muted
+                        playsInline
+                        className="w-full h-full object-cover mirror"
+                    />
+
+                    {/* Overlay de Scanning Otimizado para Touch/Visualização */}
+                    {sistemaPronto && !estaProcessando && (
+                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-8">
+                            <div className="w-full max-w-[280px] aspect-square border-2 border-[#9ECD1D]/20 rounded-[3rem] md:rounded-[4rem] relative">
+                                <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-[#9ECD1D] rounded-tl-2xl" />
+                                <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-[#9ECD1D] rounded-tr-2xl" />
+                                <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-[#9ECD1D] rounded-bl-2xl" />
+                                <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-[#9ECD1D] rounded-br-2xl" />
+                                <div className="absolute top-1/2 left-0 w-full h-0.5 bg-[#9ECD1D]/40 animate-scan shadow-[0_0_15px_#9ECD1D]" />
+                            </div>
+                        </div>
+                    )}
+
+                    {estaProcessando && (
+                        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center z-20 gap-4">
+                            <Loader2 className="w-12 h-12 text-[#9ECD1D] animate-spin" />
+                            <p className="font-smart-detail text-[10px] uppercase tracking-widest text-[#9ECD1D]">Processando...</p>
+                        </div>
+                    )}
+                </div>
+            </main>
+
+            {/* Footer: Simplificado para telas pequenas */}
+            <footer className="p-8 flex flex-wrap justify-center gap-6 md:gap-10 opacity-30 grayscale items-center text-zinc-400">
+                <div className="flex items-center gap-2 text-[8px] md:text-[9px] font-smart-detail font-bold uppercase tracking-widest">
+                    <Smartphone size={14} /> Local Sync
+                </div>
+                <div className="hidden md:block h-4 w-px bg-zinc-800" />
+                <div className="flex items-center gap-2 text-[8px] md:text-[9px] font-smart-detail font-bold uppercase tracking-widest">
+                    <ShieldCheck size={14} /> Secure Bio
                 </div>
             </footer>
 
             <style jsx>{`
                 .mirror { transform: rotateY(180deg); }
                 @keyframes scan {
-                    0%, 100% { top: 10%; }
-                    50% { top: 90%; }
+                    0%, 100% { top: 15%; opacity: 0.5; }
+                    50% { top: 85%; opacity: 1; }
                 }
                 .animate-scan {
                     position: absolute;
-                    animation: scan 3s ease-in-out infinite;
+                    animation: scan 2.5s ease-in-out infinite;
                 }
             `}</style>
         </div>
