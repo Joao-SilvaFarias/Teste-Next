@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/src/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
+import { Lock, Mail, Loader2, AlertCircle, ShieldAlert, ChevronLeft, Fingerprint } from 'lucide-react';
 import { useAuth } from '@/src/context/AuthContext';
 
 export default function AdminLogin() {
@@ -33,67 +33,73 @@ export default function AdminLogin() {
 
       if (error) throw error;
       
-      // O useEffect cuidará do redirecionamento assim que o Supabase 
-      // disparar o evento de mudança de estado captado pelo seu Context.
     } catch (err: any) {
       setErrorMsg(err.message === 'Invalid login credentials' 
-        ? 'E-mail ou senha incorretos.' 
-        : 'Erro ao conectar ao servidor.');
+        ? 'ACESSO NEGADO: CREDENCIAIS INVÁLIDAS' 
+        : 'ERRO DE COMUNICAÇÃO COM O SERVIDOR');
       setLoadingInterno(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6">
-      <div className="max-w-md w-full animate-in fade-in slide-in-from-bottom-6 duration-700">
+    <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      
+      {/* BACKGROUND ELEMENTS */}
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#9ECD1D]/50 to-transparent opacity-20" />
+      <div className="absolute -top-24 -left-24 w-96 h-96 bg-[#9ECD1D]/5 rounded-full blur-[120px] pointer-events-none" />
+
+      <div className="max-w-md w-full animate-in fade-in zoom-in duration-700">
         
-        <header className="text-center mb-10">
-          <h1 className="text-4xl font-black text-white italic tracking-tighter">
-            ADMIN<span className="text-[#9ECD1D]">GATE</span>
+        <header className="text-center mb-12 relative">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-[#0a0a0a] border border-white/5 rounded-2xl mb-6 shadow-2xl">
+            <ShieldAlert className="text-[#9ECD1D] w-8 h-8 animate-pulse" />
+          </div>
+          <h1 className="text-4xl font-black text-white italic tracking-tighter uppercase leading-none">
+            STAFF<span className="text-[#9ECD1D]">_AUTH</span>
           </h1>
-          <p className="text-zinc-600 text-[10px] uppercase font-bold tracking-[0.3em] mt-2">
-            Restricted Access Area
+          <p className="text-zinc-600 text-[9px] font-black uppercase tracking-[0.5em] mt-3">
+            SISTEMA DE CONTROLE RESTRITO
           </p>
         </header>
 
         <form 
           onSubmit={handleLogin} 
-          className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800 p-8 rounded-[2.5rem] shadow-2xl space-y-5"
+          className="bg-[#0a0a0a] border border-white/10 p-10 rounded-[2.5rem] shadow-[0_50px_100px_rgba(0,0,0,0.8)] space-y-6 relative overflow-hidden"
         >
-          {/* Alerta de Erro */}
+          {/* Alerta de Erro Tático */}
           {errorMsg && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold p-4 rounded-xl flex items-center gap-3 animate-shake">
-              <AlertCircle size={16} />
+            <div className="bg-red-600/10 border border-red-600/20 text-red-500 text-[10px] font-black p-4 rounded-xl flex items-center gap-3 animate-shake uppercase italic tracking-widest">
+              <AlertCircle size={16} strokeWidth={3} />
               {errorMsg}
             </div>
           )}
 
           <div className="space-y-2">
-            <label className="text-zinc-500 text-[10px] font-black uppercase ml-1 tracking-widest">E-mail</label>
+            <label className="text-zinc-700 text-[8px] font-black uppercase ml-1 tracking-[0.3em]">Operator Identity</label>
             <div className="relative group">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 w-5 h-5 group-focus-within:text-[#9ECD1D] transition-colors" />
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-800 group-focus-within:text-[#9ECD1D] transition-colors" size={18} />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="exemplo@academia.com"
-                className="w-full bg-black border border-zinc-800 rounded-2xl pl-12 pr-4 py-4 text-white focus:border-[#9ECD1D] focus:ring-1 focus:ring-[#9ECD1D]/20 outline-none transition-all placeholder:text-zinc-700"
+                placeholder="EMAIL_DE_ACESSO"
+                className="w-full bg-black border border-white/5 rounded-xl pl-12 pr-4 py-5 text-white focus:border-[#9ECD1D]/40 outline-none transition-all placeholder:text-zinc-900 text-[11px] font-black uppercase italic tracking-widest"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-zinc-500 text-[10px] font-black uppercase ml-1 tracking-widest">Senha</label>
+            <label className="text-zinc-700 text-[8px] font-black uppercase ml-1 tracking-[0.3em]">Access Key</label>
             <div className="relative group">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 w-5 h-5 group-focus-within:text-[#9ECD1D] transition-colors" />
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-800 group-focus-within:text-[#9ECD1D] transition-colors" size={18} />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-black border border-zinc-800 rounded-2xl pl-12 pr-4 py-4 text-white focus:border-[#9ECD1D] focus:ring-1 focus:ring-[#9ECD1D]/20 outline-none transition-all placeholder:text-zinc-700"
+                placeholder="SENHA_MESTRA"
+                className="w-full bg-black border border-white/5 rounded-xl pl-12 pr-4 py-5 text-white focus:border-[#9ECD1D]/40 outline-none transition-all placeholder:text-zinc-900 text-[11px] font-black uppercase italic tracking-widest"
               />
             </div>
           </div>
@@ -101,22 +107,26 @@ export default function AdminLogin() {
           <button
             type="submit"
             disabled={loadingInterno || authLoading}
-            className="w-full bg-[#9ECD1D] text-black font-black py-5 rounded-2xl hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 uppercase text-sm tracking-widest disabled:opacity-50 mt-4"
+            className="w-full bg-[#9ECD1D] text-black font-black py-5 rounded-xl hover:shadow-[0_0_30px_rgba(158,205,29,0.3)] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase text-[11px] tracking-[0.2em] disabled:opacity-50 mt-4 italic"
           >
             {loadingInterno ? (
-              <Loader2 className="animate-spin w-6 h-6" />
+              <Loader2 className="animate-spin w-5 h-5" />
             ) : (
-              'Autenticar Operador'
+              <>
+                <Fingerprint size={18} />
+                Confirmar Login
+              </>
             )}
           </button>
         </form>
         
-        <footer className="text-center mt-8">
+        <footer className="text-center mt-10">
           <button 
             onClick={() => router.push('/')} 
-            className="text-zinc-700 text-[10px] font-bold uppercase hover:text-[#9ECD1D] transition-colors tracking-widest"
+            className="group flex items-center justify-center gap-2 mx-auto text-zinc-700 text-[9px] font-black uppercase hover:text-white transition-colors tracking-[0.3em]"
           >
-            ← Voltar ao Terminal Público
+            <ChevronLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
+            Terminal Público
           </button>
         </footer>
       </div>
@@ -124,10 +134,10 @@ export default function AdminLogin() {
       <style jsx>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-4px); }
-          75% { transform: translateX(4px); }
+          25% { transform: translateX(-6px); }
+          75% { transform: translateX(6px); }
         }
-        .animate-shake { animation: shake 0.2s ease-in-out 0s 2; }
+        .animate-shake { animation: shake 0.15s ease-in-out 0s 2; }
       `}</style>
     </div>
   );
