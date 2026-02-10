@@ -1,32 +1,28 @@
-// app/api/checkout/route.ts
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
+import { stripe } from '@/src/lib/stripe';
+import { getAppUrl } from '@/src/lib/env';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16' as any,
-});
+export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
   try {
     const { priceId, email } = await req.json();
 
-    if (!priceId) {
-      return NextResponse.json({ error: "Price ID não fornecido" }, { status: 400 });
+    if (!priceId || typeof priceId !== 'string') {
+      return NextResponse.json({ error: 'Price ID não fornecido' }, { status: 400 });
     }
 
     const session = await stripe.checkout.sessions.create({
-      customer_email: email || undefined,
+      customer_email: typeof email === 'string' ? email : undefined,
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      // Certifique-se que NEXT_PUBLIC_URL está correta no .env
-      success_url: `http://localhost:3000/registrar-rosto?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `http://localhost:3000`,
+      success_url: `${getAppUrl()}/registrar-rosto?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: getAppUrl(),
     });
 
     return NextResponse.json({ url: session.url });
-
-  } catch (error: any) {
-    console.error("ERRO STRIPE:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    console.error('ERRO STRIPE [checkout]:', error);
+    return NextResponse.json({ error: 'Não foi possível iniciar o checkout.' }, { status: 500 });
   }
 }
