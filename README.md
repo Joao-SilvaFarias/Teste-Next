@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BXVS Connect
 
-## Getting Started
+Sistema de gestão para academia com foco em operação real: autenticação, biometria facial, área administrativa e cobrança recorrente via Stripe.
 
-First, run the development server:
+## Requisitos
+
+- Node.js 20+
+- npm 10+
+- Projeto Supabase configurado
+- Conta Stripe (modo teste e produção)
+
+## Variáveis de ambiente
+
+Crie um arquivo `.env.local` com:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+STRIPE_SECRET_KEY=...
+STRIPE_WEBHOOK_SECRET=...
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+> Em produção, use a URL pública do seu domínio em `NEXT_PUBLIC_APP_URL`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Como rodar localmente
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+npm run dev
+```
 
-## Learn More
+Abra [http://localhost:3000](http://localhost:3000).
 
-To learn more about Next.js, take a look at the following resources:
+## Fluxo de pagamento (Stripe)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. API `/api/checkout` cria sessão de assinatura.
+2. Webhook `/api/webhooks` recebe eventos e atualiza status do aluno.
+3. API `/api/portal` abre o portal de gerenciamento da assinatura.
+4. API `/api/salvar-rosto` salva biometria após checkout concluído.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Padrões de produção recomendados
 
-## Deploy on Vercel
+- Use banco Supabase com backups ativos.
+- Configure observabilidade (logs e alertas) para webhooks.
+- Mantenha chaves separadas por ambiente (dev/staging/prod).
+- Ative HTTPS e domínio próprio no deploy.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Scripts
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run dev     # desenvolvimento
+npm run build   # build de produção
+npm run start   # servidor de produção
+npm run lint    # lint do projeto
+```
